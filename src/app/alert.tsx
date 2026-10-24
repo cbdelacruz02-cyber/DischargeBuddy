@@ -1,22 +1,21 @@
+import type { LanguageLabel } from '@/constants/safety-content';
+import { getLanguage } from '@/constants/safety-content';
+import { getUiCopy } from '@/constants/ui-copy';
+import { useAppLanguage } from '@/contexts/language-context';
 import * as Haptics from 'expo-haptics';
-import * as Speech from 'expo-speech';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useEffect, useRef, useState } from 'react';
+import * as Speech from 'expo-speech';
+import { useCallback, useEffect } from 'react';
 import {
   AccessibilityInfo,
   Animated,
-  Easing,
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
   Vibration,
-  View,
+  View
 } from 'react-native';
-import { getLanguage } from '@/constants/safety-content';
-import type { LanguageLabel } from '@/constants/safety-content';
-import { getUiCopy } from '@/constants/ui-copy';
-import { useAppLanguage } from '@/contexts/language-context';
 
 export default function AlertScreen() {
   const params = useLocalSearchParams<{
@@ -49,7 +48,7 @@ export function EmergencyFlow({ languageLabel, fontScale, soundLevel, speechRate
   const language = getLanguage(languageLabel);
   const copy = getUiCopy(languageLabel);
   const voiceVolume = Math.min(1, Math.max(0, soundLevel / 100));
-  const speak = (text: string) => {
+  const speak = useCallback((text: string) => {
     AccessibilityInfo.announceForAccessibility(text);
     const startSpeech = () => Speech.speak(text, {
       language: language.code,
@@ -57,48 +56,31 @@ export function EmergencyFlow({ languageLabel, fontScale, soundLevel, speechRate
       volume: voiceVolume,
     });
     void Speech.stop().then(startSpeech, startSpeech);
-  };
-  const [countdown, setCountdown] = useState(10);
-  const [phase, setPhase] = useState<'countdown' | 'confirm' | 'yellow' | 'simulated' | 'cancelled'>('countdown');
-  const [painScore, setPainScore] = useState<number | null>(null);
-  const pulseAnim = useRef(new Animated.Value(1)).current;
-
-  useEffect(() => {
-    if (phase !== 'countdown' || countdown > 3) {
-      pulseAnim.setValue(1);
-      return;
-    }
-    const animation = Animated.loop(Animated.sequence([
-      Animated.timing(pulseAnim, { toValue: 1.12, duration: 320, easing: Easing.out(Easing.quad), useNativeDriver: true }),
-      Animated.timing(pulseAnim, { toValue: 1, duration: 320, easing: Easing.in(Easing.quad), useNativeDriver: true }),
-    ]));
-    animation.start();
-    return () => animation.stop();
-  }, [countdown, phase, pulseAnim]);
+  }, [language.code, speechRate, voiceVolume]);
 
   useEffect(() => {
     speak(language.emergencyPrompt);
     return () => {
       Speech.stop();
     };
-  }, [language.code, language.emergencyPrompt, speechRate, voiceVolume]);
+  }, [speak, language.emergencyPrompt]);
 
   // Haptic vibration loop
   useEffect(() => {
-    if (phase === 'countdown') {
-      const hapticLoop = setInterval(() => {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
-        Vibration.vibrate([0, 250, 150, 250]);
-      }, 1200);
-      return () => {
-        clearInterval(hapticLoop);
-        Vibration.cancel();
-      };
-    }
+    if (phase !== 'countdown') return;
+   const hapticLoop = setInterval(() => {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+      Vibration.vibrate();
+    }, 1200);
+    return () => {
+      clearInterval(hapticLoop);
+      Vibration.cancel();
+    };
   }, [phase]);
 
+  
   // Countdown timer
-  useEffect(() => {
+  useEffect(() => { 
     if (phase === 'confirm') {
       speak(language.emergencyConfirmationPrompt);
     }

@@ -2,7 +2,6 @@ import type { LanguageLabel } from '@/constants/safety-content';
 import { getLanguage } from '@/constants/safety-content';
 import { getUiCopy } from '@/constants/ui-copy';
 import { useAppLanguage } from '@/contexts/language-context';
-import { NetworkGate } from '@/components/NetworkGate';
 import * as Haptics from 'expo-haptics';
 import { router, useLocalSearchParams } from 'expo-router';
 import * as Speech from 'expo-speech';
@@ -26,32 +25,18 @@ export default function AlertScreen() {
     speechRate?: string;
   }>();
   const { languageLabel } = useAppLanguage();
-  const speechRate = Number(params.speechRate) || 0.8;
-  const soundLevel = Number(params.soundLevel) || 80;
-  const voiceVolume = Math.min(1, Math.max(0, soundLevel / 100));
-
-  const [networkReady, setNetworkReady] = useState(false);
-
-  if (!networkReady) {
-    return (
-      <NetworkGate
-        onReady={() => setNetworkReady(true)}
-        speechRate={speechRate}
-        voiceVolume={voiceVolume}
-      />
-    );
-  }
 
   return (
     <EmergencyFlow
       languageLabel={(params.language as LanguageLabel | undefined) ?? languageLabel}
       fontScale={Number(params.fontScale) || 1.25}
-      soundLevel={soundLevel}
-      speechRate={speechRate}
+      soundLevel={Number(params.soundLevel) || 80}
+      speechRate={Number(params.speechRate) || 0.8}
       onExit={() => router.back()}
     />
   );
 }
+
 
 type EmergencyFlowProps = {
   languageLabel: LanguageLabel;

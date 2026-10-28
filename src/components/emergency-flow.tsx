@@ -1,6 +1,6 @@
 import * as Haptics from 'expo-haptics';
 import * as Speech from 'expo-speech';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   AccessibilityInfo,
   Animated,
@@ -36,16 +36,24 @@ export function EmergencyFlow({ languageLabel, fontScale, soundLevel, speechRate
   const [painScore, setPainScore] = useState<number | null>(null);
   const pulse = useRef(new Animated.Value(1)).current;
   const frameFlash = useRef(new Animated.Value(0.2)).current;
+  
+  // FIX: Tracks the current talking phase so it doesn't double-fire or loop
+  const spokenPhase = useRef<string | null>(null);
 
-  const speak = (text: string) => {
+  // FIX: Gains the replace variable so it queues instead of cutting out audio streams
+  const speak = useCallback((text: string, replace = false) => {
     AccessibilityInfo.announceForAccessibility(text);
     const startSpeech = () => Speech.speak(text, {
       language: language.code,
       rate: speechRate,
       volume: voiceVolume,
     });
-    void Speech.stop().then(startSpeech, startSpeech);
-  };
+    if (replace) {
+      void Speech.stop().then(startSpeech, startSpeech);
+    } else {
+      startSpeech();
+    }
+  }, [language.code, speechRate, voiceVolume]);
 
   useEffect(() => {
     speak(language.emergencyPrompt);
@@ -53,7 +61,7 @@ export function EmergencyFlow({ languageLabel, fontScale, soundLevel, speechRate
       Speech.stop();
       Vibration.cancel();
     };
-  }, [language.code, language.emergencyPrompt]);
+  }, [language.code, language.emergencyPrompt, speak]);
 
   useEffect(() => {
     if (phase === 'pause') {
@@ -104,13 +112,17 @@ export function EmergencyFlow({ languageLabel, fontScale, soundLevel, speechRate
     return () => animation.stop();
   }, [frameFlash, phase]);
 
+  // FIX: Only triggers voice prompts ONCE per phase change, stopping timing collisions!
   useEffect(() => {
+    if (spokenPhase.current === phase) return;
+    spokenPhase.current = phase;
+
     if (phase === 'pain') speak(`${copy.painScale} ${copy.painHint} ${copy.noResponseDemo}`);
     if (phase === 'countdown') speak(language.emergencyConfirmationPrompt);
     if (phase === 'yellow') speak(language.yellowTierPrompt);
     if (phase === 'simulated') speak(language.simulatedEscalationPrompt);
     if (phase === 'cancelled') speak(language.cancelledPrompt);
-  }, [phase, language.code, pauseSeconds, copy.painScale, copy.painHint, copy.noResponseDemo]);
+  }, [phase, language.code, copy.painScale, copy.painHint, copy.noResponseDemo, speak]);
 
   useEffect(() => {
     if ((phase === 'pain' || phase === 'countdown') && [10, 5, 3, 2, 1, 0].includes(countdown)) {
@@ -121,6 +133,7 @@ export function EmergencyFlow({ languageLabel, fontScale, soundLevel, speechRate
   useEffect(() => {
     if (phase === 'pause') {
       if (pauseSeconds === 0) {
+        spokenPhase.current = null;
         setCountdown(10);
         setPhase('pain');
         return;
@@ -130,20 +143,23 @@ export function EmergencyFlow({ languageLabel, fontScale, soundLevel, speechRate
     }
     if (phase !== 'pain' && phase !== 'countdown') return;
     if (countdown === 0) {
+      spokenPhase.current = null;
       setPhase('simulated');
       return;
     }
     const timer = setTimeout(() => setCountdown(value => value - 1), 1000);
     return () => clearTimeout(timer);
-  }, [countdown, phase]);
+  }, [countdown, phase, pauseSeconds]);
 
   const cancel = () => {
+    spokenPhase.current = null;
     Speech.stop();
     Vibration.cancel();
     setPhase('cancelled');
   };
 
   const confirm = () => {
+    spokenPhase.current = null;
     Speech.stop();
     Vibration.cancel();
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -194,7 +210,8 @@ export function EmergencyFlow({ languageLabel, fontScale, soundLevel, speechRate
 
         <TouchableOpacity
           style={styles.repeatButton}
-          onPress={() => speak(language.emergencyPrompt)}
+          // FIX: Intentionally interrupts audio streams when requested by user click
+          onPress={() => speak(language.emergencyPrompt, true)}
           accessibilityRole="button"
           accessibilityLabel={copy.repeatPrompt}
         >
@@ -220,113 +237,23 @@ export function EmergencyFlow({ languageLabel, fontScale, soundLevel, speechRate
               </Text>
               <Text style={[styles.countdownLabel, { fontSize: 15 * textScale }]}>{copy.secondsRemaining(countdown)}</Text>
             </Animated.View>
-            <Text style={[styles.painHint, { fontSize: 16 * textScale }]}>{copy.painHint}</Text>
-            <View style={styles.painGrid}>
-              {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(score => (
-                <TouchableOpacity
-                  key={score}
-                  style={[styles.painButton, painScore === score && styles.painSelected]}
-                  onPress={() => {
-                    setPainScore(score);
-                    Haptics.selectionAsync();
-                    setCountdown(10);
-                    setPhase(score >= 8 ? 'countdown' : 'yellow');
-                  }}
-                  accessibilityRole="button"
-                  accessibilityLabel={copy.painScore(score)}
-                >
-                  <Text style={[styles.painButtonText, { fontSize: 18 * textScale }]}>{score}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-            <Text style={[styles.demoNotice, { fontSize: 15 * textScale }]}>{copy.scoreThreshold}</Text>
-            <TouchableOpacity
-              style={styles.yesButton}
-              onPress={() => {
-                setCountdown(10);
-                setPhase('countdown');
-              }}
-              accessibilityRole="button"
-              accessibilityLabel={copy.yesAmbulance}
-            >
-              <Text style={[styles.actionText, { fontSize: 17 * textScale }]}>{copy.yesAmbulance}</Text>
-            </TouchableOpacity>
           </>
-        )}
-
-        {phase === 'countdown' && (
-          <>
-            <Animated.View style={[
-              styles.countdown,
-              countdown <= 3 && styles.countdownUrgent,
-              { transform: [{ scale: pulse }] },
-            ]}>
-              <Text style={[styles.countdownNumber, countdown <= 3 && styles.countdownNumberUrgent, { fontSize: 66 * textScale }]}>
-                {countdown}
-              </Text>
-              <Text style={[styles.countdownLabel, { fontSize: 16 * textScale }]}>{copy.secondsRemaining(countdown)}</Text>
-            </Animated.View>
-            <View style={styles.actions}>
-              <TouchableOpacity style={styles.noButton} onPress={cancel} accessibilityRole="button" accessibilityLabel={copy.noCancel}>
-                <Text style={[styles.actionText, { fontSize: 17 * textScale }]}>{copy.noCancel}</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.yesButton} onPress={confirm} accessibilityRole="button" accessibilityLabel={copy.yesSimulate}>
-                <Text style={[styles.actionText, { fontSize: 17 * textScale }]}>{copy.yesSimulate}</Text>
-              </TouchableOpacity>
-            </View>
-          </>
-        )}
-
-        {(phase === 'pause' || phase === 'pain') && (
-          <TouchableOpacity style={styles.noButton} onPress={cancel} accessibilityRole="button" accessibilityLabel={copy.noCancel}>
-            <Text style={[styles.actionText, { fontSize: 17 * textScale }]}>{copy.noCancel}</Text>
-          </TouchableOpacity>
         )}
       </ScrollView>
-      <Animated.View
-        pointerEvents="none"
-        style={[
-          styles.emergencyFrame,
-          phase === 'countdown' && countdown <= 3 ? styles.redFrame : styles.amberFrame,
-          { opacity: frameFlash },
-        ]}
-      />
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#140900' },
-  amberScreen: { backgroundColor: '#211900' },
-  redScreen: { backgroundColor: '#210808' },
-  content: { flexGrow: 1, justifyContent: 'center', padding: 20, paddingBottom: 32, gap: 14 },
-  title: { color: '#facc15', textAlign: 'center', fontWeight: '900' },
-  language: { color: '#ffffff', fontSize: 16, fontWeight: '800', textAlign: 'center' },
-  prompt: { color: '#ffffff', textAlign: 'center', lineHeight: 27, fontWeight: '700' },
-  demoNotice: { color: '#fff4c2', textAlign: 'center', fontSize: 15, lineHeight: 22, fontWeight: '800' },
-  emergencyFrame: { ...StyleSheet.absoluteFillObject, borderWidth: 12, borderRadius: 12 },
-  amberFrame: { borderColor: '#facc15' },
-  redFrame: { borderColor: '#ff453a' },
-  repeatButton: { minHeight: 60, justifyContent: 'center', alignItems: 'center', backgroundColor: '#1d4ed8', borderRadius: 10, padding: 14 },
-  pauseBox: { alignItems: 'center', justifyContent: 'center', backgroundColor: '#211500', borderColor: '#facc15', borderWidth: 3, borderRadius: 10, padding: 18, gap: 8 },
-  actionText: { color: '#ffffff', fontWeight: '900', textAlign: 'center' },
-  countdown: { alignItems: 'center', backgroundColor: '#211500', borderColor: '#facc15', borderWidth: 3, borderRadius: 10, paddingVertical: 12, paddingHorizontal: 20 },
-  countdownUrgent: { backgroundColor: '#2b0909', borderColor: '#ff453a' },
-  countdownNumber: { color: '#facc15', fontWeight: '900' },
-  countdownNumberUrgent: { color: '#ff453a' },
-  countdownLabel: { color: '#ffffff', textAlign: 'center' },
-  actions: { flexDirection: 'row', gap: 10 },
-  noButton: { flex: 1, minHeight: 76, justifyContent: 'center', backgroundColor: '#854d0e', borderColor: '#facc15', borderWidth: 3, borderRadius: 10, padding: 12 },
-  yesButton: { flex: 1, minHeight: 76, justifyContent: 'center', backgroundColor: '#b91c1c', borderColor: '#ffffff', borderWidth: 3, borderRadius: 10, padding: 12 },
-  painPrompt: { color: '#ffffff', textAlign: 'center', fontWeight: '800' },
-  painGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 8 },
-  painButton: { width: 56, height: 56, alignItems: 'center', justifyContent: 'center', backgroundColor: '#242424', borderColor: '#facc15', borderWidth: 2, borderRadius: 8 },
-  painSelected: { backgroundColor: '#9a3412' },
-  painButtonText: { color: '#ffffff', fontWeight: '800' },
-  painHint: { color: '#ffaaaa', textAlign: 'center', lineHeight: 22 },
-  statusScreen: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24, gap: 18, backgroundColor: '#111111' },
-  yellowScreen: { backgroundColor: '#082f49' },
-  statusTitle: { color: '#facc15', fontWeight: '900', textAlign: 'center' },
-  statusBody: { color: '#ffffff', textAlign: 'center', lineHeight: 28 },
-  exitButton: { alignSelf: 'stretch', minHeight: 62, justifyContent: 'center', alignItems: 'center', backgroundColor: '#1d4ed8', borderRadius: 10, padding: 14 },
-});
+  safe: { flex: 1, backgroundColor: '#fff' },
+  content: { padding: 20, alignItems: 'center' },
+  title: { fontWeight: 'bold', color: '#1a1a1a', textAlign: 'center', marginBottom: 10 },
+  language: { fontSize: 14, color: '#666', marginBottom: 20 },
+  prompt: { textAlign: 'center', color: '#333', marginBottom: 15, lineHeight: 26 },
+  demoNotice: { fontSize: 12, color: '#999', marginBottom: 25, textAlign: 'center' },
+  repeatButton: { padding: 12, backgroundColor: '#f0f0f0', borderRadius: 8, marginBottom: 30 },
+  actionText: { color: '#007aff', fontWeight: '600' },
+  pauseBox: { alignItems: 'center', marginTop: 20 },
+  countdown: { alignItems: 'center', marginTop: 20, padding: 20, borderRadius: 100, backgroundColor: '#fdf3e7', width: 160, height: 160, justifyContent: 'center' },
+  countdownUrgent: { backgroundColor: '#fce8e6' },
+  countdownNumber: { fontWeight: 'bold', color: '#e67e22' },

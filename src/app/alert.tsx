@@ -2,10 +2,11 @@ import type { LanguageLabel } from '@/constants/safety-content';
 import { getLanguage } from '@/constants/safety-content';
 import { getUiCopy } from '@/constants/ui-copy';
 import { useAppLanguage } from '@/contexts/language-context';
+import { NetworkGate } from '@/components/NetworkGate';
 import * as Haptics from 'expo-haptics';
 import { router, useLocalSearchParams } from 'expo-router';
 import * as Speech from 'expo-speech';
-import { useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   AccessibilityInfo,
   Animated,
@@ -25,12 +26,28 @@ export default function AlertScreen() {
     speechRate?: string;
   }>();
   const { languageLabel } = useAppLanguage();
+  const speechRate = Number(params.speechRate) || 0.8;
+  const soundLevel = Number(params.soundLevel) || 80;
+  const voiceVolume = Math.min(1, Math.max(0, soundLevel / 100));
+
+  const [networkReady, setNetworkReady] = useState(false);
+
+  if (!networkReady) {
+    return (
+      <NetworkGate
+        onReady={() => setNetworkReady(true)}
+        speechRate={speechRate}
+        voiceVolume={voiceVolume}
+      />
+    );
+  }
+
   return (
     <EmergencyFlow
       languageLabel={(params.language as LanguageLabel | undefined) ?? languageLabel}
       fontScale={Number(params.fontScale) || 1.25}
-      soundLevel={Number(params.soundLevel) || 80}
-      speechRate={Number(params.speechRate) || 0.8}
+      soundLevel={soundLevel}
+      speechRate={speechRate}
       onExit={() => router.back()}
     />
   );
@@ -44,10 +61,21 @@ type EmergencyFlowProps = {
   onExit: () => void;
 };
 
+type Phase = 'countdown' | 'confirm' | 'yellow' | 'simulated' | 'cancelled';
+
 export function EmergencyFlow({ languageLabel, fontScale, soundLevel, speechRate, onExit }: EmergencyFlowProps) {
+  // ── State declarations ────────────────────────────────────────────────────
+  const [phase, setPhase] = useState<Phase>('countdown');
+  const [countdown, setCountdown] = useState<number>(10);
+  const [painScore, setPainScore] = useState<number | null>(null);
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+
+  // ── Derived values ────────────────────────────────────────────────────────
   const language = getLanguage(languageLabel);
   const copy = getUiCopy(languageLabel);
   const voiceVolume = Math.min(1, Math.max(0, soundLevel / 100));
+
+  // ── TTS wrapper ───────────────────────────────────────────────────────────
   const speak = useCallback((text: string) => {
     AccessibilityInfo.announceForAccessibility(text);
     const startSpeech = () => Speech.speak(text, {
@@ -58,6 +86,7 @@ export function EmergencyFlow({ languageLabel, fontScale, soundLevel, speechRate
     void Speech.stop().then(startSpeech, startSpeech);
   }, [language.code, speechRate, voiceVolume]);
 
+  // ── Effects ───────────────────────────────────────────────────────────────
   useEffect(() => {
     speak(language.emergencyPrompt);
     return () => {
@@ -68,7 +97,7 @@ export function EmergencyFlow({ languageLabel, fontScale, soundLevel, speechRate
   // Haptic vibration loop
   useEffect(() => {
     if (phase !== 'countdown') return;
-   const hapticLoop = setInterval(() => {
+    const hapticLoop = setInterval(() => {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
       Vibration.vibrate();
     }, 1200);
@@ -78,9 +107,8 @@ export function EmergencyFlow({ languageLabel, fontScale, soundLevel, speechRate
     };
   }, [phase]);
 
-  
-  // Countdown timer
-  useEffect(() => { 
+  // Phase-change voice prompts
+  useEffect(() => {
     if (phase === 'confirm') {
       speak(language.emergencyConfirmationPrompt);
     }
@@ -95,12 +123,14 @@ export function EmergencyFlow({ languageLabel, fontScale, soundLevel, speechRate
     }
   }, [phase, language, speechRate, voiceVolume]);
 
+  // Countdown accessibility announcements
   useEffect(() => {
     if (phase === 'countdown' && [10, 5, 3, 2, 1, 0].includes(countdown)) {
       AccessibilityInfo.announceForAccessibility(`${countdown} seconds remaining in the emergency demo.`);
     }
   }, [countdown, phase]);
 
+  // Countdown timer
   useEffect(() => {
     if (phase !== 'countdown') return;
     if (countdown === 0) {
@@ -111,6 +141,7 @@ export function EmergencyFlow({ languageLabel, fontScale, soundLevel, speechRate
     return () => clearTimeout(timer);
   }, [phase, countdown]);
 
+  // ── Handlers ──────────────────────────────────────────────────────────────
   function stopAlert() {
     Speech.stop();
     Vibration.cancel();
@@ -138,6 +169,7 @@ export function EmergencyFlow({ languageLabel, fontScale, soundLevel, speechRate
     }
   }
 
+  // ── Render ────────────────────────────────────────────────────────────────
   if (phase === 'simulated') {
     return (
       <View style={styles.dispatchedScreen}>
@@ -163,7 +195,6 @@ export function EmergencyFlow({ languageLabel, fontScale, soundLevel, speechRate
     );
   }
 
-  // CANCELLED screen
   if (phase === 'cancelled') {
     return (
       <View style={styles.cancelledScreen}>
@@ -237,7 +268,6 @@ export function EmergencyFlow({ languageLabel, fontScale, soundLevel, speechRate
         ))}
       </View>
       <Text style={[styles.painHint, { fontSize: 12 * fontScale }]}>{copy.painHint}</Text>
-
     </ScrollView>
   );
 }

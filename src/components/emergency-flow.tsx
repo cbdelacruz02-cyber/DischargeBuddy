@@ -25,35 +25,43 @@ type EmergencyFlowProps = {
   onClose: () => void;
 };
 
-export function EmergencyFlow({ languageLabel, fontScale, soundLevel, speechRate, onClose }: EmergencyFlowProps) {
+export function EmergencyFlow({
+  languageLabel,
+  fontScale,
+  soundLevel,
+  speechRate,
+  onClose,
+}: EmergencyFlowProps) {
   const language = getLanguage(languageLabel);
   const copy = getUiCopy(languageLabel);
   const voiceVolume = Math.min(1, Math.max(0, soundLevel / 100));
   const textScale = Math.min(1.75, Math.max(1.25, fontScale));
+
   const [countdown, setCountdown] = useState(10);
   const [pauseSeconds, setPauseSeconds] = useState(2);
-  const [phase, setPhase] = useState<'pause' | 'pain' | 'countdown' | 'yellow' | 'simulated' | 'cancelled'>('pause');
+  const [phase, setPhase] = useState<
+    'pause' | 'pain' | 'countdown' | 'yellow' | 'simulated' | 'cancelled'
+  >('pause');
   const [painScore, setPainScore] = useState<number | null>(null);
+
   const pulse = useRef(new Animated.Value(1)).current;
   const frameFlash = useRef(new Animated.Value(0.2)).current;
-  
-  // FIX: Tracks the current talking phase so it doesn't double-fire or loop
   const spokenPhase = useRef<string | null>(null);
 
-  // FIX: Gains the replace variable so it queues instead of cutting out audio streams
-  const speak = useCallback((text: string, replace = false) => {
-    AccessibilityInfo.announceForAccessibility(text);
-    const startSpeech = () => Speech.speak(text, {
-      language: language.code,
-      rate: speechRate,
-      volume: voiceVolume,
-    });
-    if (replace) {
-      void Speech.stop().then(startSpeech, startSpeech);
-    } else {
-      startSpeech();
-    }
-  }, [language.code, speechRate, voiceVolume]);
+  const speak = useCallback(
+    (text: string, replace = false) => {
+      AccessibilityInfo.announceForAccessibility(text);
+      if (replace) {
+        void Speech.stop().then(
+          () => Speech.speak(text, { language: language.code, rate: speechRate, volume: voiceVolume }),
+          () => Speech.speak(text, { language: language.code, rate: speechRate, volume: voiceVolume }),
+        );
+      } else {
+        Speech.speak(text, { language: language.code, rate: speechRate, volume: voiceVolume });
+      }
+    },
+    [language.code, speechRate, voiceVolume],
+  );
 
   useEffect(() => {
     speak(language.emergencyPrompt);
@@ -91,10 +99,22 @@ export function EmergencyFlow({ languageLabel, fontScale, soundLevel, speechRate
       pulse.setValue(1);
       return;
     }
-    const animation = Animated.loop(Animated.sequence([
-      Animated.timing(pulse, { toValue: 1.12, duration: 320, easing: Easing.out(Easing.quad), useNativeDriver: true }),
-      Animated.timing(pulse, { toValue: 1, duration: 320, easing: Easing.in(Easing.quad), useNativeDriver: true }),
-    ]));
+    const animation = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulse, {
+          toValue: 1.12,
+          duration: 320,
+          easing: Easing.out(Easing.quad),
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulse, {
+          toValue: 1,
+          duration: 320,
+          easing: Easing.in(Easing.quad),
+          useNativeDriver: true,
+        }),
+      ]),
+    );
     animation.start();
     return () => animation.stop();
   }, [countdown, phase, pulse]);
@@ -104,28 +124,42 @@ export function EmergencyFlow({ languageLabel, fontScale, soundLevel, speechRate
       frameFlash.setValue(0);
       return;
     }
-    const animation = Animated.loop(Animated.sequence([
-      Animated.timing(frameFlash, { toValue: 0.9, duration: 650, easing: Easing.linear, useNativeDriver: true }),
-      Animated.timing(frameFlash, { toValue: 0.2, duration: 650, easing: Easing.linear, useNativeDriver: true }),
-    ]));
+    const animation = Animated.loop(
+      Animated.sequence([
+        Animated.timing(frameFlash, {
+          toValue: 0.9,
+          duration: 650,
+          easing: Easing.linear,
+          useNativeDriver: true,
+        }),
+        Animated.timing(frameFlash, {
+          toValue: 0.2,
+          duration: 650,
+          easing: Easing.linear,
+          useNativeDriver: true,
+        }),
+      ]),
+    );
     animation.start();
     return () => animation.stop();
   }, [frameFlash, phase]);
 
-  // FIX: Only triggers voice prompts ONCE per phase change, stopping timing collisions!
   useEffect(() => {
     if (spokenPhase.current === phase) return;
     spokenPhase.current = phase;
 
-    if (phase === 'pain') speak(`${copy.painScale} ${copy.painHint} ${copy.noResponseDemo}`);
+    if (phase === 'pain')      speak(`${copy.painScale} ${copy.painHint} ${copy.noResponseDemo}`);
     if (phase === 'countdown') speak(language.emergencyConfirmationPrompt);
-    if (phase === 'yellow') speak(language.yellowTierPrompt);
+    if (phase === 'yellow')    speak(language.yellowTierPrompt);
     if (phase === 'simulated') speak(language.simulatedEscalationPrompt);
     if (phase === 'cancelled') speak(language.cancelledPrompt);
   }, [phase, language.code, copy.painScale, copy.painHint, copy.noResponseDemo, speak]);
 
   useEffect(() => {
-    if ((phase === 'pain' || phase === 'countdown') && [10, 5, 3, 2, 1, 0].includes(countdown)) {
+    if (
+      (phase === 'pain' || phase === 'countdown') &&
+      [10, 5, 3, 2, 1, 0].includes(countdown)
+    ) {
       AccessibilityInfo.announceForAccessibility(copy.secondsRemaining(countdown));
     }
   }, [countdown, phase, copy]);
@@ -133,71 +167,90 @@ export function EmergencyFlow({ languageLabel, fontScale, soundLevel, speechRate
   useEffect(() => {
     if (phase === 'pause') {
       if (pauseSeconds === 0) {
-        spokenPhase.current = null;
         setCountdown(10);
         setPhase('pain');
         return;
       }
-      const pauseTimer = setTimeout(() => setPauseSeconds(value => value - 1), 1000);
+      const pauseTimer = setTimeout(() => setPauseSeconds(v => v - 1), 1000);
       return () => clearTimeout(pauseTimer);
     }
     if (phase !== 'pain' && phase !== 'countdown') return;
     if (countdown === 0) {
-      spokenPhase.current = null;
       setPhase('simulated');
       return;
     }
-    const timer = setTimeout(() => setCountdown(value => value - 1), 1000);
+    const timer = setTimeout(() => setCountdown(v => v - 1), 1000);
     return () => clearTimeout(timer);
   }, [countdown, phase, pauseSeconds]);
 
   const cancel = () => {
-    spokenPhase.current = null;
     Speech.stop();
     Vibration.cancel();
+    spokenPhase.current = null;
     setPhase('cancelled');
   };
 
   const confirm = () => {
-    spokenPhase.current = null;
     Speech.stop();
     Vibration.cancel();
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    spokenPhase.current = null;
     setPhase('simulated');
   };
 
-  const showStatus = phase === 'yellow' || phase === 'simulated' || phase === 'cancelled';
+  const showStatus =
+    phase === 'yellow' || phase === 'simulated' || phase === 'cancelled';
+
   if (showStatus) {
-    const title = phase === 'yellow'
-      ? copy.yellowTier
-      : phase === 'simulated'
-        ? copy.simulatedEscalation
-        : copy.cancelled;
-    const message = phase === 'yellow'
-      ? copy.yellowTierExplanation
-      : phase === 'simulated'
-        ? copy.simulatedNoAction
-        : copy.noCall;
+    const title =
+      phase === 'yellow'
+        ? copy.yellowTier
+        : phase === 'simulated'
+          ? copy.simulatedEscalation
+          : copy.cancelled;
+    const message =
+      phase === 'yellow'
+        ? copy.yellowTierExplanation
+        : phase === 'simulated'
+          ? copy.simulatedNoAction
+          : copy.noCall;
 
     return (
-      <SafeAreaView style={[styles.statusScreen, phase === 'yellow' && styles.yellowScreen]}>
-        <Text style={[styles.statusTitle, { fontSize: 28 * textScale }]}>{title}</Text>
-        <Text style={[styles.statusBody, { fontSize: 18 * textScale }]}>{message}</Text>
-        <TouchableOpacity style={styles.exitButton} onPress={onClose} accessibilityRole="button" accessibilityLabel={copy.returnHome}>
-          <Text style={[styles.actionText, { fontSize: 18 * textScale }]}>{copy.returnHome}</Text>
+      <SafeAreaView
+        style={[styles.statusScreen, phase === 'yellow' && styles.yellowScreen]}
+      >
+        <Text style={[styles.statusTitle, { fontSize: 28 * textScale }]}>
+          {title}
+        </Text>
+        <Text style={[styles.statusBody, { fontSize: 18 * textScale }]}>
+          {message}
+        </Text>
+        <TouchableOpacity
+          style={styles.exitButton}
+          onPress={onClose}
+          accessibilityRole="button"
+          accessibilityLabel={copy.returnHome}
+        >
+          <Text style={[styles.actionText, { fontSize: 18 * textScale }]}>
+            {copy.returnHome}
+          </Text>
         </TouchableOpacity>
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={[
-      styles.safe,
-      (phase === 'pause' || phase === 'pain') && styles.amberScreen,
-      phase === 'countdown' && styles.redScreen,
-    ]}>
+    <SafeAreaView
+      style={[
+        styles.safe,
+        (phase === 'pause' || phase === 'pain') && styles.amberScreen,
+        phase === 'countdown' && styles.redScreen,
+      ]}
+    >
       <ScrollView contentContainerStyle={styles.content}>
-        <Text style={[styles.title, { fontSize: 27 * textScale }]}>{copy.alertTitle}</Text>
+        <Text style={[styles.title, { fontSize: 27 * textScale }]}>
+          {copy.alertTitle}
+        </Text>
         <Text style={styles.language}>{copy.promptLanguage(language.label)}</Text>
         <Text style={[styles.prompt, { fontSize: 18 * textScale }]}>
           {phase === 'pause'
@@ -210,12 +263,13 @@ export function EmergencyFlow({ languageLabel, fontScale, soundLevel, speechRate
 
         <TouchableOpacity
           style={styles.repeatButton}
-          // FIX: Intentionally interrupts audio streams when requested by user click
           onPress={() => speak(language.emergencyPrompt, true)}
           accessibilityRole="button"
           accessibilityLabel={copy.repeatPrompt}
         >
-          <Text style={[styles.actionText, { fontSize: 17 * textScale }]}>{copy.repeatPrompt}</Text>
+          <Text style={[styles.actionText, { fontSize: 17 * textScale }]}>
+            {copy.repeatPrompt}
+          </Text>
         </TouchableOpacity>
 
         {phase === 'pause' && (
@@ -254,6 +308,3 @@ const styles = StyleSheet.create({
   repeatButton: { padding: 12, backgroundColor: '#f0f0f0', borderRadius: 8, marginBottom: 30 },
   actionText: { color: '#007aff', fontWeight: '600' },
   pauseBox: { alignItems: 'center', marginTop: 20 },
-  countdown: { alignItems: 'center', marginTop: 20, padding: 20, borderRadius: 100, backgroundColor: '#fdf3e7', width: 160, height: 160, justifyContent: 'center' },
-  countdownUrgent: { backgroundColor: '#fce8e6' },
-  countdownNumber: { fontWeight: 'bold', color: '#e67e22' },

@@ -1,0 +1,42 @@
+{
+  "name": "DischargeBuddy AI Assist",
+  "short_name": "DischargeBuddy",
+  "description": "Standalone offline-first post-discharge medical companion. Emergency evaluation, medication management, and accessible care guidance — no internet required.",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0a0a14",
+  "theme_color": "#208AEF",
+  "lang": "en-US",
+  "scope": "/",
+  "categories": ["medical", "health", "lifestyle"],
+  "icons": [
+    {
+      "src": "/favicon.ico",
+      "sizes": "64x64 32x32 24x24 16x16",
+      "type": "image/x-icon"
+    },
+    {
+      "src": "/assets/images/icon.png",
+      "sizes": "1024x1024",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/assets/images/android-icon-foreground.png",
+      "sizes": "1024x1024",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "/assets/images/splash-icon.png",
+      "sizes": "76x76",
+      "type": "image/png",
+      "label": "DischargeBuddy splash screen"
+    }
+  ],
+  "prefer_related_applications": false,
+  "related_applications": []
+}

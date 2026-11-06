@@ -2,6 +2,7 @@ import * as Haptics from 'expo-haptics';
 import * as Speech from 'expo-speech';
 import { useEffect, useRef, useState } from 'react';
 import {
+  Animated,
   AccessibilityInfo,
   Alert,
   Modal,
@@ -61,6 +62,19 @@ export default function HomeScreen() {
   const [medicationReminders,      setMedicationReminders]      = useState<Record<string, boolean>>({});
   const [testReminderActive,       setTestReminderActive]       = useState(false);
   const [showEmergency,            setShowEmergency]            = useState(false);
+
+  // ── HELP button pulse animation ───────────────────────────────────────────
+  const helpPulse = useRef(new Animated.Value(1)).current;
+  useEffect(() => {
+    const pulse = Animated.loop(
+      Animated.sequence([
+        Animated.timing(helpPulse, { toValue: 1.015, duration: 1000, useNativeDriver: true }),
+        Animated.timing(helpPulse, { toValue: 1,     duration: 1000, useNativeDriver: true }),
+      ]),
+    );
+    pulse.start();
+    return () => pulse.stop();
+  }, [helpPulse]);
   const [detectionAttempts,        setDetectionAttempts]        = useState(0);
   const [pendingLanguage,          setPendingLanguage]          = useState<LanguageLabel | null>(null);
   const [showLanguageFallback,     setShowLanguageFallback]     = useState(false);
@@ -231,7 +245,7 @@ export default function HomeScreen() {
       <SafeAreaView style={[styles.safe, isHighContrast && styles.safeHighContrast]}>
 
         {/* ══════════════════════════════════════════════════════════════════
-            STANDALONE / CLOUD SYNC TOGGLE — PINNED STICKY ABOVE SCROLL VIEW
+            STATUS BAR — PINNED STICKY ABOVE SCROLL VIEW
             Not inside ScrollView. Always visible. Cannot be scrolled away.
             Single source of truth — passed to EmergencyFlow as a prop.
         ══════════════════════════════════════════════════════════════════ */}
@@ -240,48 +254,51 @@ export default function HomeScreen() {
           accessibilityRole="none"
         >
           <View style={styles.standaloneLeft}>
-            <Text style={styles.standaloneIcon}>{isStandalone ? '[OFF]' : '[NET]'}</Text>
-            <View>
-              <Text style={styles.standaloneMode}>
-                {isStandalone ? 'STANDALONE MODE' : 'CLOUD SYNC ON'}
-              </Text>
-              <Text style={styles.standaloneSub}>
-                {isStandalone
-                  ? 'All offline \u00B7 TTS \u00B7 timers \u00B7 haptics \u2014 no internet'
-                  : 'Connected \u00B7 cloud features active'}
-              </Text>
-            </View>
+            <Text style={styles.standaloneIcon}>{isStandalone ? '\u25CF' : '\u25CF'}</Text>
+            <Text style={styles.standaloneMode}>
+              {isStandalone ? 'Offline mode \u2014 no internet needed' : 'Connected \u00B7 cloud features active'}
+            </Text>
           </View>
-          <Switch
-            value={!isStandalone}
-            onValueChange={(on: boolean) => {
-              const next = !on;
-              setIsStandalone(next);
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-              speak(
-                next
-                  ? 'Standalone Mode activated. All subsystems running from local device memory. No internet required.'
-                  : 'Cloud Sync activated. Connected mode enabled.',
-              );
-            }}
-            trackColor={{ false: '#374151', true: '#1d4ed8' }}
-            thumbColor={isStandalone ? '#94a3b8' : '#60a5fa'}
-            ios_backgroundColor="#374151"
-            accessibilityRole="switch"
-            accessibilityLabel={
-              isStandalone
-                ? 'Standalone Mode is ON. Slide right to enable Cloud Sync.'
-                : 'Cloud Sync is ON. Slide left to enable Standalone Mode.'
-            }
-          />
         </View>
 
         {/* ── Scrollable content below the sticky toggle ── */}
         <ScrollView contentContainerStyle={styles.scroll}>
 
-          {/* Language bar */}
+          {/* Patient overview header */}
+          <View style={[styles.header, isHighContrast && styles.cardHighContrast]}>
+            <Text style={[styles.appName,   { fontSize: 14 * fontScale }]}>DischargeBuddy AI Assist</Text>
+            <Text style={[styles.greeting,  { fontSize: 29 * fontScale }]}>{copy.welcomeBack}, {patient.name}</Text>
+            <Text style={[styles.bodyText,  { fontSize: 16 * fontScale }]}>{copy.condition}</Text>
+            <Text style={[styles.bodyText, styles.summary, { fontSize: 15 * fontScale }]}>
+              {copy.medsComplete(takenCount, medications.length)}
+            </Text>
+            {/* Medication progress bar */}
+            <View style={styles.progressTrack} accessibilityElementsHidden>
+              <View style={[styles.progressFill, { width: `${(takenCount / medications.length) * 100}%` }]} />
+            </View>
+            <Text style={[styles.offlineText, { fontSize: 12 * fontScale }]}>{copy.offlineSample}</Text>
+          </View>
+
+          {/* HELP button — launches full 7-guardrail emergency flow */}
+          <Animated.View style={{ transform: [{ scale: helpPulse }] }}>
+            <TouchableOpacity
+              style={styles.helpButton}
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+                setShowEmergency(true);
+              }}
+              accessibilityRole="button"
+              accessibilityLabel={`${copy.help}. ${copy.emergencyDemo}`}
+              accessibilityHint="Opens the full 7-guardrail emergency evaluation sequence. Demo only — no real calls placed."
+            >
+              <Text style={[styles.helpTitle,    { fontSize: 29 * fontScale }]}>{copy.help}</Text>
+              <Text style={[styles.helpSubtitle, { fontSize: 16 * fontScale }]}>{copy.helpSubtitle}</Text>
+            </TouchableOpacity>
+          </Animated.View>
+
+          {/* Language bar — below HELP, lower priority */}
           <View style={[styles.languageBar, isHighContrast && styles.cardHighContrast]}>
-            <Text style={[styles.languageLabel, { fontSize: 17 * fontScale }]}>
+            <Text style={[styles.languageLabel, { fontSize: 13 * fontScale }]}>
               {copy.currentLanguage(language.label)}
             </Text>
             <View style={styles.languageChoices}>
@@ -305,37 +322,11 @@ export default function HomeScreen() {
             </View>
           </View>
 
-          {/* Patient overview header */}
-          <View style={[styles.header, isHighContrast && styles.cardHighContrast]}>
-            <Text style={[styles.appName,   { fontSize: 20 * fontScale }]}>DischargeBuddy AI Assist</Text>
-            <Text style={[styles.greeting,  { fontSize: 29 * fontScale }]}>{copy.welcomeBack}, {patient.name}</Text>
-            <Text style={[styles.bodyText,  { fontSize: 17 * fontScale }]}>{copy.condition}</Text>
-            <Text style={[styles.bodyText, styles.summary, { fontSize: 16 * fontScale }]}>
-              {copy.medsComplete(takenCount, medications.length)}
-            </Text>
-            <Text style={[styles.offlineText, { fontSize: 14 * fontScale }]}>{copy.offlineSample}</Text>
-          </View>
-
-          {/* HELP button — launches full 7-guardrail emergency flow */}
-          <TouchableOpacity
-            style={styles.helpButton}
-            onPress={() => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
-              setShowEmergency(true);
-            }}
-            accessibilityRole="button"
-            accessibilityLabel={`${copy.help}. ${copy.emergencyDemo}`}
-            accessibilityHint="Opens the full 7-guardrail emergency evaluation sequence. Demo only — no real calls placed."
-          >
-            <Text style={[styles.helpTitle,    { fontSize: 29 * fontScale }]}>{copy.help}</Text>
-            <Text style={[styles.helpSubtitle, { fontSize: 17 * fontScale }]}>{copy.helpSubtitle}</Text>
-          </TouchableOpacity>
-
           {/* Today's medications */}
           <View style={styles.section}>
             <Text style={[styles.sectionTitle, { fontSize: 22 * fontScale }]}>{copy.medications}</Text>
             {medications.map((medication, index) => (
-              <View key={medication.name} style={styles.medicationRow}>
+              <View key={medication.name} style={[styles.medicationRow, medication.taken && styles.medicationRowTaken]}>
                 <Text style={[styles.medicationName, { fontSize: 18 * fontScale }]}>{medication.name}</Text>
                 <Text style={[styles.bodyText,       { fontSize: 16 * fontScale }]}>{copy.dueAt(medication.time)}</Text>
                 <View style={styles.actionRow}>
@@ -403,6 +394,34 @@ export default function HomeScreen() {
             <View style={styles.accessibilityPanel}>
               <Text style={[styles.sectionTitle, { fontSize: 21 * fontScale }]}>{copy.accessibilityControls}</Text>
               <Text style={[styles.bodyText,     { fontSize: 16 * fontScale }]}>{copy.foregroundReminderNote}</Text>
+              {/* Cloud / Offline toggle — moved here from sticky header */}
+              <View style={styles.switchRow}>
+                <Text style={[styles.switchLabel, { fontSize: 14 * fontScale }]}>
+                  {isStandalone ? 'Offline mode (no internet)' : 'Cloud Sync on'}
+                </Text>
+                <Switch
+                  value={!isStandalone}
+                  onValueChange={(on: boolean) => {
+                    const next = !on;
+                    setIsStandalone(next);
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                    speak(
+                      next
+                        ? 'Offline mode activated. All features running from local device. No internet required.'
+                        : 'Cloud Sync activated. Connected mode enabled.',
+                    );
+                  }}
+                  trackColor={{ false: '#334155', true: '#1d4ed8' }}
+                  thumbColor={isStandalone ? '#94a3b8' : '#60a5fa'}
+                  ios_backgroundColor="#334155"
+                  accessibilityRole="switch"
+                  accessibilityLabel={
+                    isStandalone
+                      ? 'Offline mode is ON. Slide right to enable Cloud Sync.'
+                      : 'Cloud Sync is ON. Slide left to enable Offline mode.'
+                  }
+                />
+              </View>
               <TouchableOpacity style={styles.secondaryButton} onPress={speakDashboard} accessibilityRole="button">
                 <Text style={[styles.actionText, { fontSize: 16 * fontScale }]}>{copy.speakPrompt}</Text>
               </TouchableOpacity>
@@ -477,7 +496,7 @@ export default function HomeScreen() {
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
-  safe:             { flex: 1, backgroundColor: '#050505' },
+  safe:             { flex: 1, backgroundColor: '#0a0a0a' },
   safeHighContrast: { backgroundColor: '#000000' },
   cardHighContrast: { backgroundColor: '#111827', borderColor: '#facc15', borderWidth: 3 },
 
@@ -486,38 +505,38 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#1c1917',
-    borderBottomColor: '#78716c',
-    borderBottomWidth: 2,
+    backgroundColor: '#111827',
+    borderBottomColor: '#1e293b',
+    borderBottomWidth: 1,
     paddingHorizontal: 16,
-    paddingVertical: 14,
+    paddingVertical: 10,
     gap: 10,
   },
   standaloneBarCloud: {
-    backgroundColor: '#0c2340',
+    backgroundColor: '#0c1a2e',
     borderBottomColor: '#1d4ed8',
   },
   standaloneLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: 10,
     flex: 1,
   },
   standaloneIcon: {
     color: '#94a3b8',
-    fontSize: 13,
-    fontWeight: '900',
-    letterSpacing: 0.5,
+    fontSize: 11,
+    fontWeight: '600',
+    letterSpacing: 0.3,
   },
   standaloneMode: {
-    color: '#e2e8f0',
-    fontWeight: '900',
-    fontSize: 14,
-    letterSpacing: 0.8,
-    lineHeight: 19,
+    color: '#cbd5e1',
+    fontWeight: '600',
+    fontSize: 13,
+    letterSpacing: 0.3,
+    lineHeight: 18,
   },
   standaloneSub: {
-    color: '#64748b',
+    color: '#475569',
     fontSize: 11,
     lineHeight: 15,
   },
@@ -525,41 +544,50 @@ const styles = StyleSheet.create({
   // Scrollable area
   scroll: { padding: 16, paddingBottom: 40, gap: 14 },
 
-  // Language bar
-  languageBar:            { backgroundColor: '#111827', borderColor: '#facc15', borderWidth: 2, borderRadius: 10, padding: 12, gap: 8 },
-  languageLabel:          { color: '#facc15', fontWeight: '800' },
+  // Language bar — quiet, below patient header
+  languageBar:            { backgroundColor: '#0f172a', borderRadius: 10, padding: 12, gap: 8 },
+  languageLabel:          { color: '#94a3b8', fontWeight: '600', fontSize: 13 },
   languageChoices:        { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  languageButton:         { minHeight: 52, minWidth: 82, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 14, borderRadius: 8, borderWidth: 2, borderColor: '#94a3b8', backgroundColor: '#1f2937' },
-  languageButtonSelected: { backgroundColor: '#1d4ed8', borderColor: '#ffffff' },
-  languageButtonText:     { color: '#ffffff', fontWeight: '800' },
+  languageButton:         { minHeight: 48, minWidth: 82, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 14, borderRadius: 8, borderWidth: 1, borderColor: '#334155', backgroundColor: '#1e293b' },
+  languageButtonSelected: { backgroundColor: '#1d4ed8', borderColor: '#60a5fa', borderWidth: 2 },
+  languageButtonText:     { color: '#e2e8f0', fontWeight: '600' },
 
   // Patient header
-  header:      { backgroundColor: '#111827', borderColor: '#facc15', borderWidth: 2, borderRadius: 10, padding: 16, gap: 4 },
-  appName:     { color: '#60a5fa', fontWeight: '900' },
-  greeting:    { color: '#ffffff', fontWeight: '900', lineHeight: 38 },
-  bodyText:    { color: '#f3f4f6', lineHeight: 24 },
-  summary:     { color: '#bfdbfe', fontWeight: '800' },
-  offlineText: { color: '#facc15', fontWeight: '800', marginTop: 6 },
+  header:      { backgroundColor: '#111827', borderColor: '#1e293b', borderWidth: 1, borderRadius: 12, padding: 16, gap: 4 },
+  appName:     { color: '#60a5fa', fontWeight: '600', fontSize: 14, letterSpacing: 0.3 },
+  greeting:    { color: '#f1f5f9', fontWeight: '700', lineHeight: 38 },
+  bodyText:    { color: '#94a3b8', lineHeight: 22 },
+  summary:     { color: '#93c5fd', fontWeight: '600' },
+  offlineText: { color: '#facc15', fontWeight: '600', marginTop: 6, fontSize: 12 },
+
+  // Progress bar (medication completion)
+  progressTrack: { height: 6, borderRadius: 3, backgroundColor: '#1e293b', marginTop: 8 },
+  progressFill:  { height: 6, borderRadius: 3, backgroundColor: '#16a34a' },
 
   // HELP button
-  helpButton:    { minHeight: 100, justifyContent: 'center', alignItems: 'center', backgroundColor: '#991b1b', borderColor: '#fecaca', borderWidth: 3, borderRadius: 10, padding: 16, gap: 6 },
-  helpTitle:     { color: '#ffffff', fontWeight: '900', textAlign: 'center' },
-  helpSubtitle:  { color: '#ffffff', textAlign: 'center', lineHeight: 24 },
+  helpButton:    { minHeight: 120, justifyContent: 'center', alignItems: 'center', backgroundColor: '#991b1b', borderColor: '#fecaca', borderWidth: 3, borderRadius: 12, padding: 16, gap: 6 },
+  helpTitle:     { color: '#ffffff', fontWeight: '700', textAlign: 'center' },
+  helpSubtitle:  { color: '#fecaca', textAlign: 'center', lineHeight: 22, fontSize: 14 },
 
   // Sections
-  section:       { gap: 10, marginTop: 4 },
-  sectionTitle:  { color: '#ffffff', fontWeight: '900' },
-  medicationRow: { backgroundColor: '#111827', borderColor: '#facc15', borderWidth: 2, borderRadius: 10, padding: 14, gap: 8 },
-  medicationName:{ color: '#ffffff', fontWeight: '800' },
-  appointment:   { backgroundColor: '#111827', borderColor: '#facc15', borderWidth: 2, borderRadius: 10, padding: 14, gap: 8 },
+  section:          { gap: 10, marginTop: 4 },
+  sectionTitle:     { color: '#f1f5f9', fontWeight: '600' },
+  medicationRow:    { backgroundColor: '#111827', borderColor: '#1e293b', borderWidth: 1, borderRadius: 12, padding: 14, gap: 8 },
+  medicationRowTaken: { backgroundColor: '#0d2818', borderColor: '#16a34a', borderWidth: 1 },
+  medicationName:   { color: '#f1f5f9', fontWeight: '600' },
+  appointment:      { backgroundColor: '#111827', borderColor: '#1e293b', borderWidth: 1, borderRadius: 12, padding: 14, gap: 8 },
 
-  // Buttons
+  // Buttons — Mark Taken is primary (flex:2), Remind Me is secondary (flex:1)
   actionRow:       { flexDirection: 'row', gap: 8 },
-  takenButton:     { flex: 1, minHeight: 62, justifyContent: 'center', alignItems: 'center', backgroundColor: '#15803d', borderRadius: 8, padding: 10 },
-  reminderButton:  { flex: 1, minHeight: 62, justifyContent: 'center', alignItems: 'center', backgroundColor: '#1d4ed8', borderRadius: 8, padding: 10 },
-  secondaryButton: { flex: 1, minHeight: 58, justifyContent: 'center', alignItems: 'center', backgroundColor: '#27272a', borderColor: '#facc15', borderWidth: 2, borderRadius: 8, padding: 10 },
-  actionText:      { color: '#ffffff', textAlign: 'center', fontWeight: '800' },
+  takenButton:     { flex: 2, minHeight: 56, justifyContent: 'center', alignItems: 'center', backgroundColor: '#15803d', borderRadius: 8, padding: 10 },
+  reminderButton:  { flex: 1, minHeight: 56, justifyContent: 'center', alignItems: 'center', backgroundColor: '#1e3a6e', borderRadius: 8, padding: 10 },
+  secondaryButton: { flex: 1, minHeight: 52, justifyContent: 'center', alignItems: 'center', backgroundColor: '#1e293b', borderColor: '#334155', borderWidth: 1, borderRadius: 8, padding: 10 },
+  actionText:      { color: '#ffffff', textAlign: 'center', fontWeight: '600' },
 
   // Accessibility panel
-  accessibilityPanel: { backgroundColor: '#111827', borderColor: '#facc15', borderWidth: 2, borderRadius: 10, padding: 14, gap: 10 },
+  accessibilityPanel: { backgroundColor: '#111827', borderColor: '#1e293b', borderWidth: 1, borderRadius: 12, padding: 14, gap: 10 },
+
+  // Switch row inside accessibility panel
+  switchRow:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 4 },
+  switchLabel: { color: '#cbd5e1', fontWeight: '500', flex: 1 },
 });

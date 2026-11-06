@@ -389,7 +389,7 @@ export function EmergencyFlow({
     if (phase !== 'pause') return;
     if (pauseSeconds === 0) {
       spokenPhase.current = null;
-      setPhase('word-check');
+      setPhase('pain');          // Framework §1: boot directly to pain assessment
       return;
     }
     const t = setTimeout(() => setPauseSeconds((v: number) => v - 1), 1000);

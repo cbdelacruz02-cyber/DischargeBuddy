@@ -159,15 +159,6 @@ function containsLangFallback(input: string): boolean {
   return LANG_FALLBACK_PHRASES.some(p => l.includes(p));
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Guardrail legend (displayed on pain screen)
-// ─────────────────────────────────────────────────────────────────────────────
-
-const GUARDRAIL_LEGEND = [
-  { label: 'RED   — Pain 8–10  → Ambulance dispatch',    color: '#ff453a' },
-  { label: 'YELLOW — Pain 1–7  → Nurse-line bridge',     color: '#facc15' },
-  { label: 'GREEN  — No pain  → Educational care info',  color: '#4ade80' },
-] as const;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Silence phase map — static, outside component
@@ -1661,46 +1652,96 @@ export function EmergencyFlow({
           </View>
         )}
 
-        {/* ── PAIN — Milestone D.4/5 ── */}
+        {/* ── PAIN — Milestone D.4/5 (elderly-first redesign) ── */}
         {phase === 'pain' && (
           <View style={styles.painSection}>
-            <Text style={[styles.sectionTitle, { fontSize: 20 * textScale }]}>
-              On a scale of 1 to 10, what is your pain or discomfort?
+            <Text style={[styles.sectionTitle, { fontSize: 22 * textScale }]}>
+              How bad is your pain right now?
             </Text>
-            <View style={styles.guardrailLegend}>
-              {GUARDRAIL_LEGEND.map(g => (
-                <Text key={g.label} style={[styles.guardrailItem, { color: g.color, fontSize: 13 * textScale }]}>
-                  {g.label}
-                </Text>
-              ))}
+
+            {/* Tier badges — colour meaning inline, no separate legend to read */}
+            <View style={styles.painTierBadges}>
+              <View style={[styles.painTierBadge, styles.painTierBadgeGreen]}>
+                <Text style={[styles.painTierBadgeText, { fontSize: 12 * textScale, color: '#4ade80' }]}>● Mild  1–3</Text>
+              </View>
+              <View style={[styles.painTierBadge, styles.painTierBadgeAmber]}>
+                <Text style={[styles.painTierBadgeText, { fontSize: 12 * textScale, color: '#fbbf24' }]}>● Moderate  4–7</Text>
+              </View>
+              <View style={[styles.painTierBadge, styles.painTierBadgeRed]}>
+                <Text style={[styles.painTierBadgeText, { fontSize: 12 * textScale, color: '#ff453a' }]}>● Severe  8–10</Text>
+              </View>
             </View>
+
             {SilenceBar}
-            <View style={styles.painGrid}>
-              {[1,2,3,4,5,6,7,8,9,10].map(score => (
+
+            {/* Row 1: 1–5 */}
+            <View style={styles.painRow}>
+              {[1, 2, 3, 4, 5].map(score => (
                 <TouchableOpacity
                   key={score}
                   style={[
                     styles.painButton,
-                    score <= 7 && styles.painButtonYellow,
-                    score >= 8 && styles.painButtonRed,
+                    score <= 3 ? styles.painButtonGreen : styles.painButtonAmber,
                     painScore === score && styles.painSelected,
                   ]}
                   onPress={() => handlePainScore(score)}
                   accessibilityRole="button"
                   accessibilityLabel={
                     copy.painScore?.(score) ??
-                    `Pain level ${score}. ${score >= 8 ? 'Red tier — ambulance.' : 'Yellow tier — nurse line.'}`
+                    `Pain level ${score}. ${score >= 8 ? 'Severe — ambulance.' : score >= 4 ? 'Moderate — nurse line.' : 'Mild — care information.'}`
                   }
                 >
-                  <Text style={[styles.painButtonText, { fontSize: 18 * textScale }]}>{score}</Text>
+                  <Text style={[styles.painButtonText, { fontSize: 22 * textScale }]}>{score}</Text>
+                  <Text style={[styles.painButtonSubLabel, { fontSize: 11 * textScale },
+                    score <= 3 ? { color: '#4ade80' } : { color: '#fbbf24' },
+                  ]}>
+                    {score <= 3 ? 'Mild' : 'Mod'}
+                  </Text>
                 </TouchableOpacity>
               ))}
             </View>
-            <Text style={[styles.demoNotice, { fontSize: 13 * textScale }]}>
-              {copy.scoreThreshold ?? '8–10 = Ambulance · 1–7 = Nurse line'}
-            </Text>
-            <TouchableOpacity style={styles.greenTierBtn} onPress={handleGreenTier} accessibilityRole="button" accessibilityLabel="I am okay — view care information">
-              <Text style={[styles.actionText, { fontSize: 15 * textScale }]}>✅ I'm Okay — Care Info</Text>
+
+            {/* Row 2: 6–10 */}
+            <View style={styles.painRow}>
+              {[6, 7, 8, 9, 10].map(score => (
+                <TouchableOpacity
+                  key={score}
+                  style={[
+                    styles.painButton,
+                    score <= 7 ? styles.painButtonAmber : styles.painButtonRed,
+                    painScore === score && styles.painSelected,
+                  ]}
+                  onPress={() => handlePainScore(score)}
+                  accessibilityRole="button"
+                  accessibilityLabel={
+                    copy.painScore?.(score) ??
+                    `Pain level ${score}. ${score >= 8 ? 'Severe — ambulance.' : 'Moderate — nurse line.'}`
+                  }
+                >
+                  <Text style={[styles.painButtonText, { fontSize: 22 * textScale }]}>{score}</Text>
+                  <Text style={[styles.painButtonSubLabel, { fontSize: 11 * textScale },
+                    score <= 7 ? { color: '#fbbf24' } : { color: '#ff453a' },
+                  ]}>
+                    {score <= 7 ? 'Mod' : 'Severe'}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            {/* Repeat prompt — promoted above "I Feel Fine" so it's thumb-reachable */}
+            <TouchableOpacity
+              style={styles.repeatButton}
+              onPress={() => speak(language.emergencyPrompt ?? 'Are you having an emergency?', true)}
+              accessibilityRole="button"
+              accessibilityLabel={copy.repeatPrompt ?? 'Repeat voice prompt'}
+            >
+              <Text style={[styles.actionText, { fontSize: 17 * textScale }]}>
+                {copy.repeatPrompt ?? '🔊 Hear Again'}
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.greenTierBtn} onPress={handleGreenTier} accessibilityRole="button" accessibilityLabel="I feel fine — view care information">
+              <Text style={[styles.actionText, { fontSize: 17 * textScale }]}>✅ I Feel Fine</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -1752,17 +1793,19 @@ export function EmergencyFlow({
           </View>
         )}
 
-        {/* Repeat prompt button */}
-        <TouchableOpacity
-          style={styles.repeatButton}
-          onPress={() => speak(language.emergencyPrompt ?? 'Are you having an emergency?', true)}
-          accessibilityRole="button"
-          accessibilityLabel={copy.repeatPrompt ?? 'Repeat voice prompt'}
-        >
-          <Text style={[styles.actionText, { fontSize: 15 * textScale }]}>
-            {copy.repeatPrompt ?? '🔊 Repeat Prompt'}
-          </Text>
-        </TouchableOpacity>
+        {/* Repeat prompt button — hidden on pain phase (has its own promoted copy above) */}
+        {phase !== 'pain' && (
+          <TouchableOpacity
+            style={styles.repeatButton}
+            onPress={() => speak(language.emergencyPrompt ?? 'Are you having an emergency?', true)}
+            accessibilityRole="button"
+            accessibilityLabel={copy.repeatPrompt ?? 'Repeat voice prompt'}
+          >
+            <Text style={[styles.actionText, { fontSize: 15 * textScale }]}>
+              {copy.repeatPrompt ?? '🔊 Repeat Prompt'}
+            </Text>
+          </TouchableOpacity>
+        )}
       </ScrollView>
 
       {/* Flashing border overlay */}
@@ -1868,14 +1911,25 @@ const styles = StyleSheet.create({
   aloneNoBtn:  { flex: 1, minHeight: 100, justifyContent: 'center', alignItems: 'center', backgroundColor: '#0c4a6e', borderColor: '#38bdf8', borderWidth: 3, borderRadius: 12, padding: 12 },
   aloneYesBtn: { flex: 1, minHeight: 100, justifyContent: 'center', alignItems: 'center', backgroundColor: '#7c2d12', borderColor: '#f97316', borderWidth: 3, borderRadius: 12, padding: 12 },
 
-  // ── Pain grid ──
-  painSection:      { gap: 14 },
-  painGrid:         { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 8 },
-  painButton:       { width: 58, height: 58, alignItems: 'center', justifyContent: 'center', backgroundColor: '#242424', borderColor: '#64748b', borderWidth: 2, borderRadius: 8 },
-  painButtonYellow: { borderColor: '#facc15', backgroundColor: '#211500' },
-  painButtonRed:    { borderColor: '#ff453a', backgroundColor: '#3a0000' },
-  painSelected:     { backgroundColor: '#9a3412' },
-  painButtonText:   { color: '#ffffff', fontWeight: '800' },
+  // ── Pain grid (elderly-first redesign) ──
+  painSection:         { gap: 14 },
+  // Two rows of 5, filling the full width
+  painRow:             { flexDirection: 'row', gap: 8 },
+  // Buttons are tall, flex to fill equal width in each row
+  painButton:          { flex: 1, minHeight: 72, alignItems: 'center', justifyContent: 'center', backgroundColor: '#242424', borderColor: '#64748b', borderWidth: 3, borderRadius: 10, paddingVertical: 6 },
+  painButtonGreen:     { borderColor: '#22c55e', backgroundColor: '#14532d' },
+  painButtonAmber:     { borderColor: '#f59e0b', backgroundColor: '#78350f' },
+  painButtonRed:       { borderColor: '#ff453a', backgroundColor: '#7f1d1d' },
+  painSelected:        { opacity: 0.75 },
+  painButtonText:      { color: '#ffffff', fontWeight: '900', textAlign: 'center' },
+  painButtonSubLabel:  { fontWeight: '700', textAlign: 'center', textTransform: 'uppercase', letterSpacing: 0.4 },
+  // Tier badge row (replaces guardrailLegend on pain screen)
+  painTierBadges:      { flexDirection: 'row', gap: 6, justifyContent: 'center' },
+  painTierBadge:       { flex: 1, paddingVertical: 5, paddingHorizontal: 4, borderRadius: 6, alignItems: 'center' },
+  painTierBadgeGreen:  { backgroundColor: '#052e16' },
+  painTierBadgeAmber:  { backgroundColor: '#431407' },
+  painTierBadgeRed:    { backgroundColor: '#3b0000' },
+  painTierBadgeText:   { fontWeight: '800', textAlign: 'center' },
 
   // ── Countdown section ──
   countdownSection:      { gap: 14, alignItems: 'center' },
@@ -1884,10 +1938,6 @@ const styles = StyleSheet.create({
   countdownNumber:       { color: '#facc15', fontWeight: '900' },
   countdownNumberUrgent: { color: '#ff453a' },
   countdownLabel:        { color: '#ffffff', textAlign: 'center' },
-
-  // ── Guardrail legend ──
-  guardrailLegend: { backgroundColor: '#1a1a2e', borderRadius: 10, padding: 12, gap: 6, borderColor: '#334155', borderWidth: 1 },
-  guardrailItem:   { fontWeight: '800' },
 
   // ── Silence bar ──
   silenceBarContainer: { gap: 6, backgroundColor: '#1e1e1e', borderRadius: 8, padding: 10, borderColor: '#ff453a', borderWidth: 1 },

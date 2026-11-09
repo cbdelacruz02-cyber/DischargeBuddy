@@ -8,7 +8,6 @@ import {
   Modal,
   ScrollView,
   StyleSheet,
-  Switch,
   Text,
   TouchableOpacity,
   View,
@@ -84,6 +83,10 @@ export default function HomeScreen() {
   // scroll view. Passed to EmergencyFlow via isStandaloneOverride prop.
   const [isStandalone, setIsStandalone] = useState(true);
 
+  // Double-tap detector for the Explore floating button
+  const exploreTapRef  = useRef<number>(0);
+  const exploreTapTime = useRef<number>(0);
+
   useEffect(() => { languageRef.current = language; }, [language]);
 
   useEffect(() => () => {
@@ -151,7 +154,9 @@ export default function HomeScreen() {
     setMedications(current =>
       current.map((item, i) => i === index ? { ...item, taken: !item.taken } : item),
     );
-    Haptics.selectionAsync();
+    // Double-tap haptic confirms single-dose completion (blueprint Rule 3)
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+    setTimeout(() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy), 140);
     speak(language.medicationTakenPrompt(medication.name, !medication.taken));
   };
 
@@ -247,21 +252,60 @@ export default function HomeScreen() {
         {/* ── Header zone: sticky bar + settings dropdown ── */}
         <View style={styles.headerZone}>
 
-          {/* Status bar row */}
-          <View style={[styles.standaloneBar, !isStandalone && styles.standaloneBarCloud]}>
-            <View style={styles.standaloneLeft}>
-              <Text style={styles.standaloneIcon}>{isStandalone ? '\u25CF' : '\u25CF'}</Text>
-              <Text style={styles.standaloneMode}>
-                {isStandalone ? 'Offline mode \u2014 no internet needed' : 'Connected \u00B7 cloud features active'}
+          {/* ── Persistent dual mode toggles — always visible ── */}
+          <View style={styles.modeToggleRow}>
+
+            {/* STAND-ALONE MODE button */}
+            <TouchableOpacity
+              style={[styles.modeBtn, isStandalone && styles.modeBtnStandaloneActive]}
+              onPress={() => {
+                setIsStandalone(true);
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                speak(
+                  'Stand-Alone Mode activated. All features running directly from your device. No internet connection required.',
+                );
+              }}
+              accessibilityRole="button"
+              accessibilityLabel="Stand-Alone Mode. Tap to run fully offline."
+              accessibilityState={{ selected: isStandalone }}
+            >
+              <Text style={styles.modeBtnIcon}>📴</Text>
+              <Text style={[styles.modeBtnLabel, { fontSize: 12 * fontScale }]}>
+                STAND-ALONE{'\n'}MODE
               </Text>
-            </View>
-            {/* Language & Accessibility button */}
+              {isStandalone && (
+                <Text style={styles.modeBtnBadge}>● ACTIVE</Text>
+              )}
+            </TouchableOpacity>
+
+            {/* CLOUD SYNC button */}
+            <TouchableOpacity
+              style={[styles.modeBtn, !isStandalone && styles.modeBtnCloudActive]}
+              onPress={() => {
+                setIsStandalone(false);
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                speak(
+                  'Cloud Sync activated. Connected mode is now enabled.',
+                );
+              }}
+              accessibilityRole="button"
+              accessibilityLabel="Cloud Sync. Tap to enable connected mode."
+              accessibilityState={{ selected: !isStandalone }}
+            >
+              <Text style={styles.modeBtnIcon}>☁️</Text>
+              <Text style={[styles.modeBtnLabel, { fontSize: 12 * fontScale }]}>
+                CLOUD{'\n'}SYNC
+              </Text>
+              {!isStandalone && (
+                <Text style={styles.modeBtnBadge}>● ACTIVE</Text>
+              )}
+            </TouchableOpacity>
+
+            {/* Language & Accessibility gear button */}
             <TouchableOpacity
               activeOpacity={0.7}
               style={[styles.gearButton, showAccessibility && styles.gearButtonActive]}
-              onPress={() => {
-                setShowAccessibility(v => !v);
-              }}
+              onPress={() => setShowAccessibility(v => !v)}
               accessibilityRole="button"
               accessibilityLabel="Language and Accessibility settings"
               accessibilityState={{ expanded: showAccessibility }}
@@ -273,6 +317,7 @@ export default function HomeScreen() {
                 <Text style={styles.gearLabel}>Language{'\n'}& Access</Text>
               )}
             </TouchableOpacity>
+
           </View>
 
           {/* ── Settings panel — dropdown anchored below the sticky bar ── */}
@@ -320,35 +365,6 @@ export default function HomeScreen() {
             <Text style={[styles.settingsSectionLabel, { fontSize: 11 * fontScale }]}>ACCESSIBILITY</Text>
             <Text style={[styles.bodyText, { fontSize: 13 * fontScale }]}>{copy.foregroundReminderNote}</Text>
 
-            {/* Offline / Cloud toggle */}
-            <View style={styles.switchRow}>
-              <Text style={[styles.switchLabel, { fontSize: 13 * fontScale }]}>
-                {isStandalone ? 'Offline mode' : 'Cloud Sync on'}
-              </Text>
-              <Switch
-                value={!isStandalone}
-                onValueChange={(on: boolean) => {
-                  const next = !on;
-                  setIsStandalone(next);
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                  speak(
-                    next
-                      ? 'Offline mode activated. All features running from local device. No internet required.'
-                      : 'Cloud Sync activated. Connected mode enabled.',
-                  );
-                }}
-                trackColor={{ false: '#334155', true: '#1d4ed8' }}
-                thumbColor={isStandalone ? '#94a3b8' : '#60a5fa'}
-                ios_backgroundColor="#334155"
-                accessibilityRole="switch"
-                accessibilityLabel={
-                  isStandalone
-                    ? 'Offline mode is ON. Slide right to enable Cloud Sync.'
-                    : 'Cloud Sync is ON. Slide left to enable Offline mode.'
-                }
-              />
-            </View>
-
             <TouchableOpacity style={styles.secondaryButton} onPress={speakDashboard} accessibilityRole="button">
               <Text style={[styles.actionText, { fontSize: 14 * fontScale }]}>{copy.speakPrompt}</Text>
             </TouchableOpacity>
@@ -361,7 +377,7 @@ export default function HomeScreen() {
               <TouchableOpacity style={styles.secondaryButton} onPress={() => setContrastMode(v => v === 'high' ? 'standard' : 'high')} accessibilityRole="button">
                 <Text style={[styles.actionText, { fontSize: 13 * fontScale }]}>{copy.highContrast}</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.secondaryButton} onPress={() => setFontScale(v => v >= 1.75 ? 1.25 : v + 0.25)} accessibilityRole="button">
+              <TouchableOpacity style={styles.secondaryButton} onPress={() => setFontScale(v => v >= 2.0 ? 1.0 : v + 0.25)} accessibilityRole="button">
                 <Text style={[styles.actionText, { fontSize: 13 * fontScale }]}>{copy.fontSize(Math.round(fontScale * 100))}</Text>
               </TouchableOpacity>
             </View>
@@ -500,7 +516,125 @@ export default function HomeScreen() {
             </TouchableOpacity>
           </Animated.View>
 
+          {/* ── Voice shortcut panel for judges (simulates hands-free triggers) ── */}
+          <View style={styles.voiceShortcutPanel}>
+            <Text style={[styles.sectionTitle, { fontSize: 14 * fontScale }]}>
+              🎙 SIMULATE VOICE TRIGGER (Judges Demo)
+            </Text>
+            <Text style={[styles.bodyText, { fontSize: 12 * fontScale }]}>
+              Tap a phrase to simulate a patient speaking it hands-free.
+            </Text>
+            <View style={styles.actionRow}>
+              {(['Help', 'My chest hurts', "I can't breathe"] as const).map(phrase => (
+                <TouchableOpacity
+                  key={phrase}
+                  style={styles.voiceTriggerBtn}
+                  onPress={() => {
+                    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+                    speak(`Trigger detected: "${phrase}". Opening emergency response.`);
+                    setShowEmergency(true);
+                  }}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Simulate patient saying: ${phrase}`}
+                >
+                  <Text style={[styles.actionText, { fontSize: 13 * fontScale }]}>
+                    {'\u201C'}{phrase}{'\u201D'}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+
+          {/* ── "I AM OKAY" — Green Tier shortcut ── */}
+          <TouchableOpacity
+            style={styles.greenTierBtn}
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              speak(
+                'You indicated you are okay. Opening your recovery and exercise guidance.',
+              );
+              setShowEmergency(true);
+            }}
+            accessibilityRole="button"
+            accessibilityLabel="I am okay. Opens safe exercise and recovery guidance."
+          >
+            <Text style={[styles.actionText, { fontSize: 18 * fontScale }]}>
+              ✅  I AM OKAY — Recovery Guide
+            </Text>
+            <Text style={[styles.bodyText, { fontSize: 13 * fontScale }]}>
+              View safe exercise recommendations from your discharge paperwork
+            </Text>
+          </TouchableOpacity>
+
         </ScrollView>
+
+        {/* ── Fixed bottom accessibility bar — never scrolls away ── */}
+        <View style={styles.bottomAccessBar}>
+          <TouchableOpacity
+            style={styles.bottomAccessBtn}
+            onPress={() => setContrastMode(v => v === 'high' ? 'standard' : 'high')}
+            accessibilityRole="button"
+            accessibilityLabel="Toggle high contrast"
+          >
+            <Text style={[styles.bottomAccessBtnText, { fontSize: 12 * fontScale }]}>
+              {isHighContrast ? '◑ Contrast' : '◐ Contrast'}
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.bottomAccessBtn}
+            onPress={() => setFontScale(v => v >= 2.0 ? 1.0 : v + 0.25)}
+            accessibilityRole="button"
+            accessibilityLabel={`Text size ${Math.round(fontScale * 100)} percent. Tap to increase.`}
+          >
+            <Text style={[styles.bottomAccessBtnText, { fontSize: 12 * fontScale }]}>
+              A+ {Math.round(fontScale * 100)}%
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.bottomAccessBtn}
+            onPress={() => setSoundLevel(v => v >= 100 ? 50 : v + 10)}
+            accessibilityRole="button"
+            accessibilityLabel={`Volume ${soundLevel} percent. Tap to increase.`}
+          >
+            <Text style={[styles.bottomAccessBtnText, { fontSize: 12 * fontScale }]}>
+              🔊 {soundLevel}%
+            </Text>
+          </TouchableOpacity>
+
+          {/* Floating Explore double-tap button — bottom right */}
+          <TouchableOpacity
+            style={styles.exploreFloatBtn}
+            onPress={() => {
+              const now   = Date.now();
+              const delta = now - exploreTapTime.current;
+              exploreTapTime.current = now;
+              exploreTapRef.current += 1;
+
+              if (exploreTapRef.current >= 2 && delta < 400) {
+                // Double-tap confirmed — read discharge paperwork aloud
+                exploreTapRef.current = 0;
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                speak(
+                  `Discharge instructions for ${patient.name}. ${language.education}`,
+                );
+              } else if (exploreTapRef.current === 1) {
+                // First tap — reset after 400 ms if no second tap arrives
+                setTimeout(() => { exploreTapRef.current = 0; }, 400);
+                speak('Tap again quickly to read discharge paperwork aloud.');
+              }
+            }}
+            accessibilityRole="button"
+            accessibilityLabel="Explore. Double-tap to read discharge paperwork aloud."
+            accessibilityHint="Tap twice quickly to start reading your discharge instructions."
+          >
+            <Text style={[styles.exploreFloatText, { fontSize: 11 * fontScale }]}>
+              📄{'\n'}EXPLORE
+            </Text>
+          </TouchableOpacity>
+        </View>
+
       </SafeAreaView>
 
       {/* Emergency flow modal — receives isStandalone from the root toggle */}
@@ -638,7 +772,7 @@ const styles = StyleSheet.create({
   // Buttons — Mark Taken is primary (flex:2), Remind Me is secondary (flex:1)
   actionRow:       { flexDirection: 'row', gap: 8 },
   takenButton:     { flex: 2, minHeight: 56, justifyContent: 'center', alignItems: 'center', backgroundColor: '#15803d', borderRadius: 8, padding: 10 },
-  reminderButton:  { flex: 1, minHeight: 56, justifyContent: 'center', alignItems: 'center', backgroundColor: '#1e3a6e', borderRadius: 8, padding: 10 },
+  reminderButton:  { flex: 1.5, minHeight: 60, justifyContent: 'center', alignItems: 'center', backgroundColor: '#1e3a6e', borderRadius: 8, padding: 10 },
   secondaryButton: { flex: 1, minHeight: 52, justifyContent: 'center', alignItems: 'center', backgroundColor: '#1e293b', borderColor: '#334155', borderWidth: 1, borderRadius: 8, padding: 10 },
   actionText:      { color: '#ffffff', textAlign: 'center', fontWeight: '600' },
 
@@ -648,4 +782,121 @@ const styles = StyleSheet.create({
   // Switch row inside accessibility panel
   switchRow:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 4 },
   switchLabel: { color: '#cbd5e1', fontWeight: '500', flex: 1 },
+
+  // ── Dual mode toggle row (blueprint Rule 1) ──────────────────────────────────
+  modeToggleRow: {
+    flexDirection: 'row',
+    alignItems: 'stretch',
+    backgroundColor: '#0a0a0a',
+    borderBottomColor: '#1e293b',
+    borderBottomWidth: 1,
+    paddingHorizontal: 8,
+    paddingVertical: 8,
+    gap: 6,
+  },
+  modeBtn: {
+    flex: 1,
+    minHeight: 64,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#1e293b',
+    borderWidth: 2,
+    borderColor: '#334155',
+    borderRadius: 10,
+    paddingVertical: 6,
+    gap: 2,
+  },
+  modeBtnStandaloneActive: {
+    backgroundColor: '#292524',
+    borderColor: '#d97706',
+  },
+  modeBtnCloudActive: {
+    backgroundColor: '#0c1a2e',
+    borderColor: '#1d4ed8',
+  },
+  modeBtnIcon:  { fontSize: 22, textAlign: 'center' },
+  modeBtnLabel: { color: '#f1f5f9', fontWeight: '800', textAlign: 'center', lineHeight: 16 },
+  modeBtnBadge: { color: '#4ade80', fontSize: 10, fontWeight: '800', textAlign: 'center' },
+
+  // ── Voice shortcut panel (judges demo panel) ──────────────────────────────────
+  voiceShortcutPanel: {
+    backgroundColor: '#1a0a00',
+    borderColor: '#d97706',
+    borderWidth: 2,
+    borderRadius: 12,
+    padding: 14,
+    gap: 10,
+    marginTop: 4,
+  },
+  voiceTriggerBtn: {
+    flex: 1,
+    minHeight: 56,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#3a0000',
+    borderColor: '#ff453a',
+    borderWidth: 2,
+    borderRadius: 8,
+    padding: 8,
+  },
+
+  // ── Green Tier "I AM OKAY" shortcut button ────────────────────────────────────
+  greenTierBtn: {
+    minHeight: 72,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#052e16',
+    borderColor: '#4ade80',
+    borderWidth: 2,
+    borderRadius: 12,
+    padding: 14,
+    gap: 4,
+    marginTop: 4,
+  },
+
+  // ── Fixed bottom accessibility bar (blueprint Rule 3) ─────────────────────────
+  bottomAccessBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#0f172a',
+    borderTopColor: '#1e293b',
+    borderTopWidth: 1,
+    paddingHorizontal: 8,
+    paddingVertical: 8,
+    gap: 6,
+  },
+  bottomAccessBtn: {
+    flex: 1,
+    minHeight: 48,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#1e293b',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#334155',
+  },
+  bottomAccessBtnText: {
+    color: '#e2e8f0',
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+
+  // ── Floating Explore double-tap button (blueprint Rule 4) ─────────────────────
+  exploreFloatBtn: {
+    minWidth: 60,
+    minHeight: 56,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#1d4ed8',
+    borderRadius: 10,
+    borderWidth: 2,
+    borderColor: '#60a5fa',
+    paddingHorizontal: 8,
+  },
+  exploreFloatText: {
+    color: '#ffffff',
+    fontWeight: '800',
+    textAlign: 'center',
+    lineHeight: 16,
+  },
 });

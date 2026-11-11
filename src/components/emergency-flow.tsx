@@ -93,6 +93,13 @@ type EmergencyFlowProps = {
   /** Callback so the component can bubble toggle changes back up to the
    *  parent when the user flips the switch from inside the modal. */
   onStandaloneChange?: (standalone: boolean) => void;
+  /**
+   * Pre-seeded phrase from the home screen voice trigger panel.
+   * "help"          → instant dispatch (skip pain scale)
+   * "chest hurts"   → word-check → pain scale
+   * "can't breathe" → word-check → pain scale
+   */
+  initialPhrase?: string;
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -199,6 +206,7 @@ export function EmergencyFlow({
   onClose,
   isStandaloneOverride,
   onStandaloneChange,
+  initialPhrase,
 }: EmergencyFlowProps) {
   const language    = getLanguage(languageLabel);
   const copy        = getUiCopy(languageLabel);
@@ -220,7 +228,7 @@ export function EmergencyFlow({
   const [interSeconds, setInterSeconds] = useState(2);
 
   // ── Countdown / silence ────────────────────────────────────────────────────
-  const [countdown, setCountdown]         = useState(10);
+  const [countdown, setCountdown]         = useState(5);
   const [silenceLeft, setSilenceLeft]     = useState(10);
   const [silenceActive, setSilenceActive] = useState(false);
   const [silenceCap, setSilenceCap]       = useState(10);
@@ -369,6 +377,38 @@ export function EmergencyFlow({
       void Speech.stop();
       Vibration.cancel();
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // initialPhrase — pre-route from home screen voice trigger panel
+  // Runs once on mount after the phase effect has fired for 'pause'.
+  // ─────────────────────────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!initialPhrase) return;
+    const lower = initialPhrase.toLowerCase().trim();
+    if (containsInstantDispatch(lower)) {
+      // "help" → instant dispatch, skip pain scale
+      const go = () => {
+        multiSensoryBurst();
+        setCountdown(5);
+        speak('Confirmed. Ambulance coming.', true);
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+        Vibration.vibrate([0, 500, 200, 500]);
+        setTimeout(() => transitionTo('simulated'), 2500);
+      };
+      // Delay slightly so mount TTS has cleared
+      setTimeout(go, 800);
+    } else if (containsDanger(lower)) {
+      // "chest hurts" / "can't breathe" → word-check → pain scale
+      const go = () => {
+        multiSensoryBurst();
+        setCountdown(5);
+        speak('Emergency phrase detected. Opening pain evaluation.', true);
+        setTimeout(() => transitionTo('pain'), 2500);
+      };
+      setTimeout(go, 800);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -595,11 +635,11 @@ export function EmergencyFlow({
       return () => { clearInterval(iv); Vibration.cancel(); };
     }
 
-    // Red Tier countdown: urgent heavy impacts every second
+    // Red Tier countdown: calm heavy impacts every second (5-second simulation)
     if (phase === 'countdown') {
       const iv = setInterval(() => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
-        Vibration.vibrate([0, 280, 120, 280]);
+        Vibration.vibrate([0, 200, 300]);
       }, 1000);
       return () => { clearInterval(iv); Vibration.cancel(); };
     }
@@ -651,7 +691,7 @@ export function EmergencyFlow({
       frameFlash.setValue(0);
       return;
     }
-    const dur = phase === 'countdown' ? 400 : 650;
+    const dur = phase === 'countdown' ? 600 : 650;
     const anim = Animated.loop(Animated.sequence([
       Animated.timing(frameFlash, { toValue: 0.95, duration: dur, easing: Easing.linear, useNativeDriver: true }),
       Animated.timing(frameFlash, { toValue: 0.15, duration: dur, easing: Easing.linear, useNativeDriver: true }),
@@ -889,18 +929,26 @@ export function EmergencyFlow({
     setTimeout(() => transitionTo('pain'), 3500);
   }, [speak, transitionTo]);
 
-  /** Milestone D.5 — pain score selection */
+  /** Milestone D.5 — pain score selection (instant one-tap routing, no extra submit) */
   const handlePainScore = useCallback((score: number) => {
     setPainScore(score);
     setSilenceActive(false);
     Haptics.selectionAsync();
-    setCountdown(10);
     if (score >= 8) {
+      // Red Tier → 2-second environmental pause → Double-Tile Safety Gate → calm 5s countdown
+      setCountdown(5);
       speak(`Pain level ${score}. Red tier. Ambulance dispatch starting now.`, true);
       setTimeout(() => transitionTo('countdown'), 1500);
-    } else {
-      speak(`Pain level ${score}. Yellow tier. Connecting you to the nurse line.`, true);
+    } else if (score >= 4) {
+      // Yellow Tier → blue screen, globe, triple-tone chime, wave vibration
+      speak(`Pain level ${score}. Moderate. Connecting you to your clinic nurse.`, true);
       setTimeout(() => transitionTo('yellow'), 1500);
+    } else {
+      // Green Tier (1–3) → local discharge files, sharp double-tap haptic
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+      setTimeout(() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy), 140);
+      speak(`Pain level ${score}. Mild. Opening your care and recovery information.`, true);
+      setTimeout(() => transitionTo('green'), 1500);
     }
   }, [speak, transitionTo]);
 
@@ -969,17 +1017,27 @@ export function EmergencyFlow({
   // Also includes "No Ambulance" text so voice intent is visible
   // ─────────────────────────────────────────────────────────────────────────
   const CancelBanner = (
-    <TouchableOpacity
-      style={styles.cancelBanner}
-      onPress={cancel}
-      accessibilityRole="button"
-      accessibilityLabel='Cancel. False Alarm. Say "No Ambulance" or press to stop immediately.'
-      activeOpacity={0.7}
-    >
-      <Text style={[styles.cancelBannerText, { fontSize: 15 * textScale }]}>
-        ✕  CANCEL / FALSE ALARM  ·  say "No Ambulance"
-      </Text>
-    </TouchableOpacity>
+    <View style={styles.cancelBannerRow}>
+      <TouchableOpacity
+        style={[styles.cancelBanner, { flex: 1 }]}
+        onPress={cancel}
+        accessibilityRole="button"
+        accessibilityLabel='Cancel. False Alarm. Say "No Ambulance" or press to stop immediately.'
+        activeOpacity={0.7}
+      >
+        <Text style={[styles.cancelBannerText, { fontSize: 15 * textScale }]}>
+          ✕  CANCEL / FALSE ALARM  ·  say &quot;No Ambulance&quot;
+        </Text>
+      </TouchableOpacity>
+      <TouchableOpacity
+        style={styles.cancelBannerSpeak}
+        onPress={() => speak('Press Cancel or say No Ambulance to stop the alert immediately.', true)}
+        accessibilityRole="button"
+        accessibilityLabel="Read cancel instructions aloud"
+      >
+        <Text style={{ fontSize: 20 }}>🔊</Text>
+      </TouchableOpacity>
+    </View>
   );
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -1432,7 +1490,7 @@ export function EmergencyFlow({
           </TouchableOpacity>
         </View>
         <Text style={[styles.sectionHint, { fontSize: 13 * textScale, marginTop: 12 }]}>
-          Say "Yes" or "No", or press the button. Attempt {langAttempts + 1} of 3.
+          Say &quot;Yes&quot; or &quot;No&quot;, or press the button. Attempt {langAttempts + 1} of 3.
         </Text>
       </SafeAreaView>
     );
@@ -1454,6 +1512,11 @@ export function EmergencyFlow({
         {ModeToggleBar}
         <Text style={[styles.statusTitle, { fontSize: 28 * textScale }]}>{title}</Text>
         <Text style={[styles.statusBody,  { fontSize: 18 * textScale }]}>{message}</Text>
+        {phase === 'simulated' && (
+          <Text style={[styles.simulatedDispatchNote, { fontSize: 15 * textScale }]}>
+            🚑 Offline Ambulance Dispatch Simulated — No real call was made
+          </Text>
+        )}
         {phase === 'simulated' && isAlone && (
           <Text style={[styles.statusNote, { fontSize: 14 * textScale }]}>
             📍 Saved: patient is alone — medical team has been alerted.
@@ -1837,11 +1900,13 @@ const styles = StyleSheet.create({
   actionText:    { color: '#ffffff', fontWeight: '900', textAlign: 'center' },
 
   // ── Cancel Banner ──
+  cancelBannerRow: { flexDirection: 'row', alignItems: 'stretch', zIndex: 100 },
   cancelBanner: {
     backgroundColor: '#7c2d12', borderBottomColor: '#facc15', borderBottomWidth: 3,
-    paddingVertical: 14, paddingHorizontal: 20, alignItems: 'center', zIndex: 100,
+    paddingVertical: 14, paddingHorizontal: 20, alignItems: 'center',
   },
   cancelBannerText: { color: '#ffffff', fontWeight: '900', letterSpacing: 1.2, textAlign: 'center' },
+  cancelBannerSpeak: { backgroundColor: '#78350f', borderBottomColor: '#facc15', borderBottomWidth: 3, minWidth: 52, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 12 },
 
   // ── Section text ──
   sectionTitle: { color: '#ffffff', fontWeight: '900', textAlign: 'center', lineHeight: 30 },
@@ -1998,7 +2063,8 @@ const styles = StyleSheet.create({
   cancelledScreen: { backgroundColor: '#001a0e' },
   statusTitle:     { color: '#ffffff', fontWeight: '900', textAlign: 'center' },
   statusBody:      { color: '#ffcccc', textAlign: 'center', lineHeight: 28 },
-  statusNote:      { color: '#fbbf24', textAlign: 'center', lineHeight: 20 },
+  statusNote:             { color: '#fbbf24', textAlign: 'center', lineHeight: 20 },
+  simulatedDispatchNote:  { color: '#86efac', fontWeight: '800', textAlign: 'center', backgroundColor: '#052e16', borderColor: '#4ade80', borderWidth: 2, borderRadius: 10, padding: 12, lineHeight: 22 },
 
   // ══════════════════════════════════════════════════════════════════
   // Standalone / Cloud Sync Mode Toggle Bar

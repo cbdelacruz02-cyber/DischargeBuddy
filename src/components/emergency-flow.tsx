@@ -59,6 +59,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { getLanguage, type LanguageLabel } from '@/constants/safety-content';
 import { getUiCopy } from '@/constants/ui-copy';
+import { useVoiceRecognition } from '@/hooks/use-voice-recognition';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Phase type
@@ -276,6 +277,49 @@ export function EmergencyFlow({
     },
     [selectedLangCode, safeRate, localVolume],
   );
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Voice recognition — active mic for alone-check, active-check, word-check
+  // Uses refs for handler callbacks to avoid dependency ordering issues.
+  // ─────────────────────────────────────────────────────────────────────────
+  const phaseRef          = useRef(phase);
+  const aloneHandlerRef   = useRef<((alone: boolean) => void) | null>(null);
+  const wordScanHandlerRef= useRef<((input: string) => void) | null>(null);
+  useEffect(() => { phaseRef.current = phase; }, [phase]);
+
+  const {
+    isListening:    emgIsListening,
+    startListening: emgStartListening,
+    stopListening:  emgStopListening,
+    supported:      emgMicSupported,
+  } = useVoiceRecognition({
+    languageCode: selectedLangCode,
+    onResult: (text: string, isFinal: boolean) => {
+      if (!isFinal) return;
+      const lower = text.toLowerCase().trim();
+      if (!lower) return;
+      emgStopListening();
+      const curPhase = phaseRef.current;
+      if (curPhase === 'alone-check') {
+        const isYes = /\b(yes|sí|si|はい|oui)\b/.test(lower);
+        const isNo  = /\b(no|no|いいえ|non)\b/.test(lower);
+        if (isYes) { aloneHandlerRef.current?.(true);  return; }
+        if (isNo)  { aloneHandlerRef.current?.(false); return; }
+      }
+      if (curPhase === 'word-check' || curPhase === 'active-check' || curPhase === 'validation') {
+        wordScanHandlerRef.current?.(lower);
+      }
+    },
+  });
+
+  // Stop mic when leaving phases that need it
+  useEffect(() => {
+    const micPhases: Phase[] = ['alone-check', 'word-check', 'active-check', 'validation'];
+    if (!micPhases.includes(phase)) {
+      emgStopListening();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase]);
 
   // ─────────────────────────────────────────────────────────────────────────
   // Standalone / Cloud Sync master toggle
@@ -928,6 +972,12 @@ export function EmergencyFlow({
     speak(msg, true);
     setTimeout(() => transitionTo('pain'), 3500);
   }, [speak, transitionTo]);
+
+  // Wire refs so the voice recognition callback can call these handlers
+  useEffect(() => { aloneHandlerRef.current   = handleAloneAnswer;  }, [handleAloneAnswer]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const handleWordScanForRef = useCallback((input: string) => handleWordScan(input), [handleWordScan]);
+  useEffect(() => { wordScanHandlerRef.current = handleWordScanForRef; }, [handleWordScanForRef]);
 
   /** Milestone D.5 — pain score selection (instant one-tap routing, no extra submit) */
   const handlePainScore = useCallback((score: number) => {
@@ -1699,11 +1749,27 @@ export function EmergencyFlow({
         {phase === 'alone-check' && (
           <View style={styles.aloneCheckBox}>
             <Text style={[styles.sectionTitle, { fontSize: 22 * textScale }]}>
-              Are you currently completely alone with zero direct physical help around you?
+              {copy.areYouAlone ?? 'Are you completely alone right now?'}
             </Text>
             <Text style={[styles.sectionBody, { fontSize: 15 * textScale }]}>
               This will be permanently saved with your medical dispatch record to inform paramedics.
             </Text>
+            {/* 🎤 Mic button for voice yes/no */}
+            {emgMicSupported && (
+              <TouchableOpacity
+                style={[styles.micBtnEmg, emgIsListening && styles.micBtnEmgActive]}
+                onPress={() => emgIsListening ? emgStopListening() : emgStartListening()}
+                accessibilityRole="button"
+                accessibilityLabel={emgIsListening ? 'Stop microphone' : 'Tap mic and say Yes or No'}
+              >
+                <Text style={{ fontSize: 24 }}>🎤</Text>
+                <Text style={[styles.actionText, { fontSize: 13 * textScale }]}>
+                  {emgIsListening
+                    ? (copy.listeningIndicator ?? '🎤 Listening…')
+                    : (copy.tapToConfirm ?? 'Tap 🎤 to answer by voice')}
+                </Text>
+              </TouchableOpacity>
+            )}
             <View style={styles.twoButtonRow}>
               <TouchableOpacity style={styles.aloneNoBtn} onPress={() => handleAloneAnswer(false)} accessibilityRole="button" accessibilityLabel="No — someone is nearby">
                 <Text style={[styles.actionText, { fontSize: 18 * textScale }]}>No — Someone{'\n'}Is Nearby</Text>
@@ -1973,8 +2039,10 @@ const styles = StyleSheet.create({
 
   // ── Alone-check ──
   aloneCheckBox: { gap: 14 },
-  aloneNoBtn:  { flex: 1, minHeight: 100, justifyContent: 'center', alignItems: 'center', backgroundColor: '#0c4a6e', borderColor: '#38bdf8', borderWidth: 3, borderRadius: 12, padding: 12 },
-  aloneYesBtn: { flex: 1, minHeight: 100, justifyContent: 'center', alignItems: 'center', backgroundColor: '#7c2d12', borderColor: '#f97316', borderWidth: 3, borderRadius: 12, padding: 12 },
+  aloneNoBtn:    { flex: 1, minHeight: 100, justifyContent: 'center', alignItems: 'center', backgroundColor: '#0c4a6e', borderColor: '#38bdf8', borderWidth: 3, borderRadius: 12, padding: 12 },
+  aloneYesBtn:   { flex: 1, minHeight: 100, justifyContent: 'center', alignItems: 'center', backgroundColor: '#7c2d12', borderColor: '#f97316', borderWidth: 3, borderRadius: 12, padding: 12 },
+  micBtnEmg:     { alignSelf: 'stretch', flexDirection: 'row', minHeight: 56, alignItems: 'center', justifyContent: 'center', gap: 10, backgroundColor: '#1e293b', borderColor: '#475569', borderWidth: 2, borderRadius: 10, padding: 10 },
+  micBtnEmgActive: { backgroundColor: '#0f3460', borderColor: '#3b82f6' },
 
   // ── Pain grid (elderly-first redesign) ──
   painSection:         { gap: 14 },
@@ -2011,7 +2079,7 @@ const styles = StyleSheet.create({
   silenceFill:  { height: '100%', backgroundColor: '#ff453a', borderRadius: 6 },
 
   // ── Flashing frame ──
-  emergencyFrame: { ...StyleSheet.absoluteFillObject, borderWidth: 12, borderRadius: 12 },
+  emergencyFrame: { ...StyleSheet.absoluteFill, borderWidth: 12, borderRadius: 12 },
   amberFrame:     { borderColor: '#facc15' },
   redFrame:       { borderColor: '#ff453a' },
 

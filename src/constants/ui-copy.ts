@@ -25,7 +25,6 @@ export type UiCopy = {
   hideTools: string;
   accessibilityControls: string;
   foregroundReminderNote: string;
-  speakPrompt: string;
   testReminder: string;
   cancelTestReminder: string;
   highContrast: string;
@@ -73,6 +72,39 @@ export type UiCopy = {
   safetyPause: (seconds: number) => string;
   scoreThreshold: string;
   noResponseDemo: string;
+  // ── Emergency flow optional keys ────────────────────────────────────────
+  greenTierPrompt?: string;
+  greenTierTitle?: string;
+  yellowNurseLine?: string;
+  greenCardDischarge?: string;
+  greenCardDischargeBody?: string;
+  greenCardFollowUp?: string;
+  greenCardFollowUpBody?: string;
+  greenCardMeds?: string;
+  greenCardMedsBody?: string;
+  greenCardEmergency?: string;
+  greenCardEmergencyBody?: string;
+  // ── Voice trigger 4-step flow ───────────────────────────────────────────
+  /** Step 1: prompt asking user to say the trigger phrase ("Help", etc.) */
+  voiceTriggerPrompt: (phrase: string) => string;
+  /** Step 1: mic listening indicator */
+  listeningIndicator: string;
+  /** Step 1: fallback tap-to-confirm label */
+  tapToConfirm: string;
+  /** Step 2: countdown screen title */
+  dispatchCountdownTitle: string;
+  /** Step 3: are-you-alone question (spoken + shown) */
+  areYouAlone: string;
+  /** Step 4: help is on the way message */
+  helpIsOnTheWay: string;
+  cancelAmbulance: string;
+  // ── Name capture (multilingual) ─────────────────────────────────────────
+  /** Full prompt asking user to bring phone close and say name slowly */
+  namePromptSpeak: string;
+  /** "I heard [name]" spoken confirmation */
+  iHeard: (name: string) => string;
+  /** Re-play name button */
+  replayName: string;
 };
 
 const copies: Record<LanguageLabel, UiCopy> = {
@@ -84,10 +116,10 @@ const copies: Record<LanguageLabel, UiCopy> = {
     cancelReminder: 'Cancel Reminder', moveOneDay: 'Move +1 Day', appointmentDateChanged: 'Demo appointment moved one day later. Set the reminder again.', offlineSample: 'OFFLINE DEMO · SAMPLE PATIENT DATA',
     help: 'HELP', helpSubtitle: 'Emergency alert demo · No call placed', moreTools: 'Language & Accessibility', hideTools: 'Hide Language & Accessibility',
     accessibilityControls: 'Accessibility Controls', foregroundReminderNote: 'In-app reminder demo only. Keep DischargeBuddy open.',
-    speakPrompt: 'Speak Prompt', testReminder: 'Test Reminder · 10 sec', cancelTestReminder: 'Cancel Reminder Test',
+    testReminder: 'Test Reminder · 10 sec', cancelTestReminder: 'Cancel Reminder Test',
     highContrast: 'High Contrast', fontSize: percent => `A+ ${percent}%`, voiceVolume: percent => `Voice ${percent}%`, voicePace: pace => `Voice pace ${pace}`,
     language: 'Language', currentLanguage: language => `Current language: ${language}`, chooseLanguage: 'Choose a prompt language.',
-    detectionSimulationNote: 'Language detection is simulated; this app does not listen to the microphone.',
+    detectionSimulationNote: 'Tap 🎤 to speak your name or use the text field below.',
     simulateLanguage: 'Simulate Language Match', confirmationChoices: 'Language confirmation choices',
     candidateLanguage: language => `Confirming: ${language}`, confirmLanguageFirst: 'Confirm language after selecting one.',
     rejectLanguageFirst: 'Select a language before rejecting it.', fallbackThreeAttempts: 'Three attempts used. Do not guess. Choose a language manually or ask an interpreter.',
@@ -108,6 +140,16 @@ const copies: Record<LanguageLabel, UiCopy> = {
     safetyPause: seconds => `Safety pause. Pain evaluation begins in ${seconds} seconds.`,
     scoreThreshold: 'DEMO SCORE CHECK · 8+ RED · 1–7 YELLOW',
     noResponseDemo: 'No response selects the simulated Red outcome. No call will be placed.',
+    voiceTriggerPrompt: phrase => `Please say "${phrase}" out loud now. Tap 🎤 to activate the microphone.`,
+    listeningIndicator: '🎤 Listening… speak clearly',
+    tapToConfirm: 'Tap to Confirm / Type',
+    dispatchCountdownTitle: '🚨 Demo Simulation',
+    areYouAlone: 'Are you alone?',
+    helpIsOnTheWay: 'Help is on the way. Ambulance is coming.',
+    cancelAmbulance: 'Cancel Ambulance',
+    namePromptSpeak: 'Please bring the phone close to your mouth and speak your name slowly.',
+    iHeard: name => `I heard: ${name}`,
+    replayName: '🔊 Replay Name',
   },
   Español: {
     homeTab: 'Inicio', exploreTab: 'Guía', welcomeBack: 'Bienvenida', condition: 'Recuperación después de cirugía cardíaca',
@@ -117,10 +159,10 @@ const copies: Record<LanguageLabel, UiCopy> = {
     cancelReminder: 'Cancelar aviso', moveOneDay: 'Mover +1 día', appointmentDateChanged: 'La cita de demostración se movió un día. Configure el recordatorio otra vez.', offlineSample: 'DEMOSTRACIÓN SIN CONEXIÓN · DATOS DE EJEMPLO',
     help: 'AYUDA', helpSubtitle: 'Demostración de alerta · No se realiza ninguna llamada', moreTools: 'Idioma y accesibilidad', hideTools: 'Ocultar idioma y accesibilidad',
     accessibilityControls: 'Controles de accesibilidad', foregroundReminderNote: 'Recordatorios de demostración. Mantenga DischargeBuddy abierto.',
-    speakPrompt: 'Leer aviso', testReminder: 'Probar aviso · 10 s', cancelTestReminder: 'Cancelar prueba',
+    testReminder: 'Probar aviso · 10 s', cancelTestReminder: 'Cancelar prueba',
     highContrast: 'Alto contraste', fontSize: percent => `Texto ${percent}%`, voiceVolume: percent => `Voz ${percent}%`, voicePace: pace => `Ritmo ${pace}`,
     language: 'Idioma', currentLanguage: language => `Idioma actual: ${language}`, chooseLanguage: 'Elija el idioma de los avisos.',
-    detectionSimulationNote: 'La detección de idioma es simulada; la aplicación no escucha el micrófono.',
+    detectionSimulationNote: 'Toque 🎤 para decir su nombre o use el campo de texto.',
     simulateLanguage: 'Simular idioma', confirmationChoices: 'Confirmación del idioma',
     candidateLanguage: language => `Por confirmar: ${language}`, confirmLanguageFirst: 'Elija un idioma antes de confirmar.',
     rejectLanguageFirst: 'Elija un idioma antes de rechazarlo.', fallbackThreeAttempts: 'Se usaron tres intentos. No adivine. Elija un idioma manualmente o pida ayuda a un intérprete.',
@@ -141,6 +183,16 @@ const copies: Record<LanguageLabel, UiCopy> = {
     safetyPause: seconds => `Pausa de seguridad. La evaluación del dolor comienza en ${seconds} segundos.`,
     scoreThreshold: 'EVALUACIÓN DE DEMOSTRACIÓN · 8+ ROJO · 1–7 AMARILLO',
     noResponseDemo: 'Si no hay respuesta, se selecciona el resultado rojo simulado. No se realizará ninguna llamada.',
+    voiceTriggerPrompt: phrase => `Por favor diga "${phrase}" en voz alta ahora. Toque 🎤 para activar el micrófono.`,
+    listeningIndicator: '🎤 Escuchando… hable con claridad',
+    tapToConfirm: 'Toque para confirmar / escribir',
+    dispatchCountdownTitle: '🚨 Simulación de demostración',
+    areYouAlone: '¿Está solo o sola?',
+    helpIsOnTheWay: 'La ayuda está en camino. La ambulancia viene.',
+    cancelAmbulance: 'Cancelar ambulancia',
+    namePromptSpeak: 'Acerque el teléfono a su boca y diga su nombre despacio.',
+    iHeard: name => `Escuché: ${name}`,
+    replayName: '🔊 Repetir nombre',
   },
   日本語: {
     homeTab: 'ホーム', exploreTab: 'ガイド', welcomeBack: 'おかえりなさい', condition: '心臓手術後の回復',
@@ -150,10 +202,10 @@ const copies: Record<LanguageLabel, UiCopy> = {
     cancelReminder: '通知を取消', moveOneDay: '1日後に変更', appointmentDateChanged: 'デモの診察日を1日後に変更しました。リマインダーを再設定してください。', offlineSample: 'オフラインデモ · サンプル患者データ',
     help: 'ヘルプ', helpSubtitle: '緊急アラートのデモ · 電話はかけません', moreTools: '言語とアクセシビリティ', hideTools: '言語とアクセシビリティを閉じる',
     accessibilityControls: 'アクセシビリティ設定', foregroundReminderNote: 'アプリ内リマインダーのデモです。アプリを開いたままにしてください。',
-    speakPrompt: '案内を読み上げる', testReminder: '通知テスト · 10秒', cancelTestReminder: '通知テストを取消',
+    testReminder: '通知テスト · 10秒', cancelTestReminder: '通知テストを取消',
     highContrast: '高コントラスト', fontSize: percent => `文字サイズ ${percent}%`, voiceVolume: percent => `音量 ${percent}%`, voicePace: pace => `読み上げ速度 ${pace}`,
     language: '言語', currentLanguage: language => `現在の言語: ${language}`, chooseLanguage: '案内の言語を選んでください。',
-    detectionSimulationNote: '言語検出はシミュレーションです。アプリはマイクを聞き取りません。',
+    detectionSimulationNote: '🎤 をタップしてお名前を話すか、以下のテキスト欄に入力してください。',
     simulateLanguage: '言語検出をシミュレート', confirmationChoices: '言語の確認',
     candidateLanguage: language => `確認中: ${language}`, confirmLanguageFirst: '確認する言語を先に選んでください。',
     rejectLanguageFirst: '拒否する前に言語を選んでください。', fallbackThreeAttempts: '3回試しました。推測しないでください。言語を選択するか通訳者に助けを求めてください。',
@@ -174,6 +226,16 @@ const copies: Record<LanguageLabel, UiCopy> = {
     safetyPause: seconds => `安全確認のため一時停止します。${seconds}秒後に痛みを評価します。`,
     scoreThreshold: 'デモ判定 · 8以上はレッド · 1〜7はイエロー',
     noResponseDemo: '応答がない場合はレッド段階のデモ結果になります。電話はかけません。',
+    voiceTriggerPrompt: phrase => `「${phrase}」と声に出して言ってください。🎤 をタップしてマイクを起動します。`,
+    listeningIndicator: '🎤 聞き取り中… はっきりお話しください',
+    tapToConfirm: 'タップして確認 / 入力',
+    dispatchCountdownTitle: '🚨 デモシミュレーション',
+    areYouAlone: '一人ですか？',
+    helpIsOnTheWay: '助けが向かっています。救急車が来ます。',
+    cancelAmbulance: '救急車をキャンセル',
+    namePromptSpeak: '携帯電話を口元に近づけて、お名前をゆっくりお話しください。',
+    iHeard: name => `聞こえました: ${name}`,
+    replayName: '🔊 名前を再生',
   },
 };
 

@@ -1,6 +1,6 @@
 import * as Haptics from 'expo-haptics';
 import * as Speech from 'expo-speech';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Animated,
   AccessibilityInfo,
@@ -21,6 +21,7 @@ import type { LanguageLabel } from '@/constants/safety-content';
 import { getUiCopy } from '@/constants/ui-copy';
 import { useAppLanguage } from '@/contexts/language-context';
 import { EmergencyFlow } from '@/components/emergency-flow';
+import { useVoiceRecognition } from '@/hooks/use-voice-recognition';
 
 // ─── Patient demo data ────────────────────────────────────────────────────────
 const PATIENT_DEFAULT_NAME = 'Maria Johnson';
@@ -106,11 +107,21 @@ export default function HomeScreen() {
 
   // ── Language / name setup flow ─────────────────────────────────────────────
   const [nameSetupPhrase, setNameSetupPhrase] = useState('');
-  const [nameSetupStep,   setNameSetupStep]   = useState<'idle' | 'speaking' | 'input' | 'confirm'>('idle');
+  const [nameSetupStep,   setNameSetupStep]   = useState<'idle' | 'speaking' | 'listening' | 'input' | 'confirm'>('idle');
+  const [heardName,       setHeardName]       = useState('');
 
   // ── Overdue alarm state ────────────────────────────────────────────────────
   const overdueTimers = useRef<Record<string, ReturnType<typeof setInterval>>>({});
   const [overdueAlarm, setOverdueAlarm] = useState<Medication | null>(null);
+
+  // ── Voice trigger 4-step state ─────────────────────────────────────────────
+  // 'idle' | 'step1-listen' | 'step2-countdown' | 'step3-alone' | 'step4-onway'
+  type VoiceStep = 'idle' | 'step1-listen' | 'step2-countdown' | 'step3-alone' | 'step4-onway';
+  const [voiceStep,       setVoiceStep]       = useState<VoiceStep>('idle');
+  const [voicePhrase,     setVoicePhrase]     = useState('');
+  const [voiceCountdown,  setVoiceCountdown]  = useState(5);
+  const [voicePauseLeft,  setVoicePauseLeft]  = useState(30);
+  const voiceTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
 
   // ── Confirm-before-take modal ──────────────────────────────────────────────
   const [pendingTakeMed, setPendingTakeMed] = useState<{ med: Medication; index: number } | null>(null);
@@ -145,11 +156,12 @@ export default function HomeScreen() {
   useEffect(() => () => {
     Object.values(timers.current).forEach(clearTimeout);
     Object.values(overdueTimers.current).forEach(clearInterval);
+    voiceTimersRef.current.forEach(clearTimeout);
     void Speech.stop();
   }, []);
 
   // ── TTS helper (offline — expo-speech only) ───────────────────────────────
-  const speak = (text: string, promptLanguage = languageRef.current) => {
+  const speak = useCallback((text: string, promptLanguage = languageRef.current) => {
     AccessibilityInfo.announceForAccessibility(text);
     const go = () => Speech.speak(text, {
       language: promptLanguage.code,
@@ -161,7 +173,7 @@ export default function HomeScreen() {
     } else {
       void Speech.stop().then(go, go);
     }
-  };
+  }, [speechRate, soundLevel]);
 
   const showReminder = (title: string, message: string, promptLanguage = languageRef.current) => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
@@ -169,22 +181,57 @@ export default function HomeScreen() {
     Alert.alert(title, message);
   };
 
+  // ── Voice recognition (name setup + voice triggers) ───────────────────────
+  const {
+    isListening:    nameIsListening,
+    startListening: nameStartListening,
+    stopListening:  nameStopListening,
+    supported:      micSupported,
+  } = useVoiceRecognition({
+    languageCode: language.code,
+    onResult: (text, isFinal) => {
+      if (!isFinal) return;
+      const trimmed = text.trim();
+      if (!trimmed) return;
+      setHeardName(trimmed);
+      setNameSetupPhrase(trimmed);
+      nameStopListening();
+      setNameSetupStep('confirm');
+      speak(`${getUiCopy(languageLabel).iHeard(trimmed)}. ${getUiCopy(languageLabel).tapToConfirm}`);
+    },
+  });
+
+  // ── Voice trigger mic (step1) ──────────────────────────────────────────────
+  const {
+    isListening:    triggerIsListening,
+    startListening: triggerStartListening,
+    stopListening:  triggerStopListening,
+  } = useVoiceRecognition({
+    languageCode: language.code,
+    onResult: (text, isFinal) => {
+      if (!isFinal) return;
+      triggerStopListening();
+      // Any spoken text in step1 counts as confirmation — proceed to step 2
+      if (voiceStep === 'step1-listen') {
+        startVoiceStep2();
+      }
+    },
+  });
+
   // ── Language helpers ───────────────────────────────────────────────────────
   const selectLanguage = (label: LanguageLabel) => {
     const next = getLanguage(label);
+    const nextCopy = getUiCopy(label);
     setLanguageLabel(label);
     Haptics.selectionAsync();
     // Speak immediately in new language
     const go = () => {
       speak(next.languageChangedPrompt, next);
-      // After language change prompt, guide name setup
+      // After language change prompt, guide name setup using new language strings
       setTimeout(() => {
         setNameSetupStep('speaking');
-        speak(
-          'Please bring the phone close to your mouth and speak your name slowly.',
-          next,
-        );
-        // After 4 seconds pause, show text input fallback
+        speak(nextCopy.namePromptSpeak, next);
+        // After 4 seconds pause, show text input + mic fallback
         setTimeout(() => setNameSetupStep('input'), 4000);
       }, 2000);
     };
@@ -196,9 +243,10 @@ export default function HomeScreen() {
   };
 
   const confirmNameSetup = () => {
-    const trimmed = nameSetupPhrase.trim();
+    const trimmed = nameSetupPhrase.trim() || heardName.trim();
     if (trimmed) setPatientName(trimmed);
     setNameSetupStep('confirm');
+    setHeardName('');
     // Ascending chime (3 haptic taps) for YES
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setTimeout(() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium), 150);
@@ -213,8 +261,9 @@ export default function HomeScreen() {
     setTimeout(() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium), 150);
     setTimeout(() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light),  300);
     setNameSetupPhrase('');
+    setHeardName('');
     setNameSetupStep('speaking');
-    speak("Let's try again. Please say your name slowly.");
+    speak(copy.namePromptSpeak);
     setTimeout(() => setNameSetupStep('input'), 4000);
   };
 
@@ -368,6 +417,88 @@ export default function HomeScreen() {
     setShowEmergency(true);
   };
 
+  // ─────────────────────────────────────────────────────────────────────────
+  // cancelVoiceFlow — stop all timers, TTS, mic for voice trigger panel
+  // ─────────────────────────────────────────────────────────────────────────
+  const cancelVoiceFlow = () => {
+    voiceTimersRef.current.forEach(clearTimeout);
+    voiceTimersRef.current = [];
+    triggerStopListening();
+    void Speech.stop();
+    setVoiceStep('idle');
+    setVoiceCountdown(5);
+    setVoicePauseLeft(30);
+  };
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // startVoiceStep2 — 5-second countdown then step 3
+  // ─────────────────────────────────────────────────────────────────────────
+  const startVoiceStep2 = () => {
+    triggerStopListening();
+    setVoiceStep('step2-countdown');
+    setVoiceCountdown(5);
+
+    // count down 5 → 0
+    const ticks = [1, 2, 3, 4, 5].map((offset) =>
+      setTimeout(() => setVoiceCountdown(v => Math.max(0, v - 1)), offset * 1000),
+    );
+
+    // After 5 seconds move to step 3 (are you alone?)
+    const t = setTimeout(() => {
+      ticks.forEach(clearTimeout);
+      setVoiceStep('step3-alone');
+      speak(copy.areYouAlone);
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+    }, 5500);
+
+    voiceTimersRef.current = [...ticks, t];
+  };
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // startVoiceStep4 — 30s pause then "Help is on the way"
+  // ─────────────────────────────────────────────────────────────────────────
+  const startVoiceStep4 = (isAlone: boolean) => {
+    void Speech.stop();
+    setVoiceStep('step4-onway');
+    setVoicePauseLeft(30);
+
+    const ticks = Array.from({ length: 30 }, (_, i) =>
+      setTimeout(() => setVoicePauseLeft(v => Math.max(0, v - 1)), (i + 1) * 1000),
+    );
+    const t = setTimeout(() => {
+      ticks.forEach(clearTimeout);
+      speak(copy.helpIsOnTheWay);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    }, 31000);
+
+    // Immediately speak alone confirmation
+    const aloneMsg = isAlone
+      ? (languageLabel === '日本語' ? '一人であることを記録しました。'
+        : languageLabel === 'Español' ? 'Entendido. Estás solo.'
+        : 'Understood. You are alone.')
+      : (languageLabel === '日本語' ? '近くにいる方に付き添いをお願いしてください。'
+        : languageLabel === 'Español' ? 'Entendido. Quédate con alguien.'
+        : 'Understood. Please stay with someone nearby.');
+    speak(aloneMsg);
+
+    voiceTimersRef.current = [...ticks, t];
+  };
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // triggerVoicePanel — Step 1: speak prompt, start mic listening
+  // ─────────────────────────────────────────────────────────────────────────
+  const triggerVoicePanel = (phrase: string) => {
+    cancelVoiceFlow();
+    setVoicePhrase(phrase);
+    setVoiceStep('step1-listen');
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+    // Speak the prompt in the current language
+    speak(copy.voiceTriggerPrompt(phrase));
+    // Auto-start mic after TTS (500ms buffer for TTS to begin playing)
+    const t = setTimeout(() => triggerStartListening(), 500);
+    voiceTimersRef.current = [t];
+  };
+
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <>
@@ -478,8 +609,38 @@ export default function HomeScreen() {
               {nameSetupStep !== 'idle' && (
                 <View style={styles.nameSetupBox}>
                   <Text style={[styles.nameSetupPrompt, { fontSize: 13 * fontScale }]}>
-                    🎙 Please say or type your name below:
+                    {copy.namePromptSpeak}
                   </Text>
+                  {/* 🎤 Mic button */}
+                  {micSupported && (nameSetupStep === 'speaking' || nameSetupStep === 'input') && (
+                    <TouchableOpacity
+                      style={[styles.micBtn, nameIsListening && styles.micBtnActive]}
+                      onPress={() => nameIsListening ? nameStopListening() : nameStartListening()}
+                      accessibilityRole="button"
+                      accessibilityLabel={nameIsListening ? 'Stop microphone' : 'Start microphone to speak name'}
+                    >
+                      <Text style={{ fontSize: 22 }}>🎤</Text>
+                      <Text style={[styles.micBtnLabel, { fontSize: 12 * fontScale }]}>
+                        {nameIsListening ? copy.listeningIndicator : '🎤 Tap to speak'}
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+                  {/* Heard name display */}
+                  {heardName !== '' && nameSetupStep !== 'confirm' && (
+                    <View style={styles.heardNameRow}>
+                      <Text style={[styles.heardNameText, { fontSize: 13 * fontScale }]}>
+                        {copy.iHeard(heardName)}
+                      </Text>
+                      <TouchableOpacity
+                        style={styles.speakerIconBtn}
+                        onPress={() => speak(copy.iHeard(heardName))}
+                        accessibilityRole="button"
+                        accessibilityLabel="Read heard name aloud"
+                      >
+                        <Text>{copy.replayName}</Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
                   {(nameSetupStep === 'input' || nameSetupStep === 'confirm') && (
                     <TextInput
                       style={[styles.nameInput, { fontSize: 15 * fontScale }]}
@@ -487,11 +648,10 @@ export default function HomeScreen() {
                       onChangeText={setNameSetupPhrase}
                       placeholder="Your name…"
                       placeholderTextColor="#64748b"
-                      autoFocus
                       accessibilityLabel="Type your name here"
                     />
                   )}
-                  {nameSetupStep === 'input' && (
+                  {(nameSetupStep === 'input' || nameSetupStep === 'confirm') && (
                     <View style={styles.nameConfirmRow}>
                       <TouchableOpacity
                         style={styles.nameYesBtn}
@@ -511,9 +671,9 @@ export default function HomeScreen() {
                       </TouchableOpacity>
                     </View>
                   )}
-                  {nameSetupStep === 'speaking' && (
+                  {nameSetupStep === 'speaking' && !nameIsListening && (
                     <Text style={[styles.bodyText, { fontSize: 12 * fontScale }]}>
-                      Listening… please speak clearly. ⏳
+                      {copy.tapToConfirm}
                     </Text>
                   )}
                 </View>
@@ -525,11 +685,6 @@ export default function HomeScreen() {
               {/* Accessibility controls */}
               <Text style={[styles.settingsSectionLabel, { fontSize: 11 * fontScale }]}>ACCESSIBILITY</Text>
               <Text style={[styles.bodyText, { fontSize: 13 * fontScale }]}>{copy.foregroundReminderNote}</Text>
-
-              {/* Speak Prompt */}
-              <TouchableOpacity style={styles.secondaryButton} onPress={speakDashboard} accessibilityRole="button">
-                <Text style={[styles.actionText, { fontSize: 14 * fontScale }]}>{copy.speakPrompt}</Text>
-              </TouchableOpacity>
 
               {/* High Contrast toggle with ✓/✗ badge */}
               <View style={styles.actionRow}>
@@ -810,42 +965,150 @@ export default function HomeScreen() {
             </View>
           </Animated.View>
 
-          {/* ── Voice shortcut panel for judges (simulates hands-free triggers) ── */}
+          {/* ── Voice trigger panel — 4-step flow ─────────────────────────────────
+               Step 1 (step1-listen):    Speak prompt + mic button + tap-to-confirm
+               Step 2 (step2-countdown): 5-second countdown screen
+               Step 3 (step3-alone):     "Are you alone?" Yes/No
+               Step 4 (step4-onway):     30-second pause → "Help is on the way"
+               idle:                     Three buttons side-by-side
+          ── */}
           <View style={styles.voiceShortcutPanel}>
             <Text style={[styles.sectionTitle, { fontSize: 14 * fontScale }]}>
-              🎙 SIMULATE VOICE TRIGGER (Judges Demo)
+              🎙 EMERGENCY VOICE TRIGGERS
             </Text>
-            <Text style={[styles.bodyText, { fontSize: 12 * fontScale }]}>
-              Tap a phrase to simulate a patient speaking it hands-free.
-            </Text>
-            <View style={styles.actionRow}>
-              {(['Help', 'My chest hurts', "I can't breathe"] as const).map(phrase => (
-                <View key={phrase} style={styles.triggerBtnWrap}>
+
+            {/* ── idle: three trigger buttons ── */}
+            {voiceStep === 'idle' && (
+              <>
+                <Text style={[styles.bodyText, { fontSize: 12 * fontScale }]}>
+                  Tap a phrase — real mic listening + 4-step flow.
+                </Text>
+                <View style={styles.actionRow}>
+                  {(['Help', 'My chest hurts', "I can't breathe"] as const).map(phrase => (
+                    <View key={phrase} style={styles.triggerBtnWrap}>
+                      <TouchableOpacity
+                        style={styles.voiceTriggerBtn}
+                        onPress={() => triggerVoicePanel(phrase)}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Activate voice trigger: ${phrase}`}
+                      >
+                        <Text style={[styles.actionText, { fontSize: 13 * fontScale }]}>
+                          {'\u201C'}{phrase}{'\u201D'}
+                        </Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={styles.speakerIconBtn}
+                        onPress={() => speak(phrase)}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Read "${phrase}" aloud`}
+                      >
+                        <Text>🔊</Text>
+                      </TouchableOpacity>
+                    </View>
+                  ))}
+                </View>
+              </>
+            )}
+
+            {/* ── Step 1: Listen & Speak Word Prompt ── */}
+            {voiceStep === 'step1-listen' && (
+              <View style={styles.voiceStepBox}>
+                <Text style={[styles.sectionTitle, { fontSize: 15 * fontScale }]}>
+                  {copy.voiceTriggerPrompt(voicePhrase)}
+                </Text>
+                <TouchableOpacity
+                  style={[styles.micBtn, triggerIsListening && styles.micBtnActive]}
+                  onPress={() => triggerIsListening ? triggerStopListening() : triggerStartListening()}
+                  accessibilityRole="button"
+                  accessibilityLabel={triggerIsListening ? 'Stop microphone' : 'Start microphone'}
+                >
+                  <Text style={{ fontSize: 32 }}>🎤</Text>
+                  <Text style={[styles.micBtnLabel, { fontSize: 13 * fontScale }]}>
+                    {triggerIsListening ? copy.listeningIndicator : '🎤 Tap to start mic'}
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.nameYesBtn}
+                  onPress={startVoiceStep2}
+                  accessibilityRole="button"
+                  accessibilityLabel="Tap to confirm and continue"
+                >
+                  <Text style={[styles.actionText, { fontSize: 14 * fontScale }]}>{copy.tapToConfirm}</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.voiceCancelBtn} onPress={cancelVoiceFlow} accessibilityRole="button">
+                  <Text style={[styles.actionText, { fontSize: 13 * fontScale }]}>✕ {copy.noCancel}</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
+            {/* ── Step 2: Demo Simulation + 5-second countdown ── */}
+            {voiceStep === 'step2-countdown' && (
+              <View style={styles.voiceStepBox}>
+                <Text style={[styles.sectionTitle, { fontSize: 18 * fontScale }]}>
+                  {copy.dispatchCountdownTitle}
+                </Text>
+                <Text style={[styles.countdownBig, { fontSize: 72 * fontScale }]}>{voiceCountdown}</Text>
+                <Text style={[styles.bodyText, { fontSize: 14 * fontScale }]}>
+                  {copy.secondsRemaining(voiceCountdown)}
+                </Text>
+                <TouchableOpacity style={styles.voiceCancelBtn} onPress={cancelVoiceFlow} accessibilityRole="button" accessibilityLabel={copy.cancelAmbulance}>
+                  <Text style={[styles.actionText, { fontSize: 14 * fontScale }]}>✕ {copy.cancelAmbulance}</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
+            {/* ── Step 3: Are You Alone? ── */}
+            {voiceStep === 'step3-alone' && (
+              <View style={styles.voiceStepBox}>
+                <Text style={[styles.sectionTitle, { fontSize: 20 * fontScale }]}>
+                  {copy.areYouAlone}
+                </Text>
+                <View style={styles.aloneRow}>
                   <TouchableOpacity
-                    style={styles.voiceTriggerBtn}
-                    onPress={() => {
-                      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-                      speak(phrase);
-                      setTimeout(() => triggerEmergency(phrase === 'Help' ? 'help' : phrase === 'My chest hurts' ? 'chest hurts' : "can't breathe"), 800);
-                    }}
+                    style={[styles.aloneYesBtn]}
+                    onPress={() => startVoiceStep4(true)}
                     accessibilityRole="button"
-                    accessibilityLabel={`Simulate patient saying: ${phrase}`}
+                    accessibilityLabel="Yes, I am alone"
                   >
-                    <Text style={[styles.actionText, { fontSize: 13 * fontScale }]}>
-                      {'\u201C'}{phrase}{'\u201D'}
-                    </Text>
+                    <Text style={[styles.actionText, { fontSize: 18 * fontScale }]}>YES</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
-                    style={styles.speakerIconBtn}
-                    onPress={() => speak(phrase)}
+                    style={[styles.aloneNoBtn]}
+                    onPress={() => startVoiceStep4(false)}
                     accessibilityRole="button"
-                    accessibilityLabel={`Read "${phrase}" aloud`}
+                    accessibilityLabel="No, someone is nearby"
                   >
-                    <Text>🔊</Text>
+                    <Text style={[styles.actionText, { fontSize: 18 * fontScale }]}>NO</Text>
                   </TouchableOpacity>
                 </View>
-              ))}
-            </View>
+                <TouchableOpacity style={styles.voiceCancelBtn} onPress={cancelVoiceFlow} accessibilityRole="button" accessibilityLabel={copy.cancelAmbulance}>
+                  <Text style={[styles.actionText, { fontSize: 13 * fontScale }]}>✕ {copy.cancelAmbulance}</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
+            {/* ── Step 4: 30-second pause + Help is on the way ── */}
+            {voiceStep === 'step4-onway' && (
+              <View style={styles.voiceStepBox}>
+                <Text style={[styles.sectionTitle, { fontSize: 18 * fontScale }]}>
+                  🚑 {copy.helpIsOnTheWay}
+                </Text>
+                <Text style={[styles.bodyText, { fontSize: 14 * fontScale }]}>
+                  {voicePauseLeft > 0 ? copy.secondsRemaining(voicePauseLeft) : copy.helpIsOnTheWay}
+                </Text>
+                <TouchableOpacity
+                  style={styles.returnHomeBtn}
+                  onPress={() => { cancelVoiceFlow(); speak(copy.returnHome); }}
+                  accessibilityRole="button"
+                  accessibilityLabel={copy.returnHome}
+                >
+                  <Text style={[styles.actionText, { fontSize: 14 * fontScale }]}>← {copy.returnHome}</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.voiceCancelBtn} onPress={cancelVoiceFlow} accessibilityRole="button" accessibilityLabel={copy.cancelAmbulance}>
+                  <Text style={[styles.actionText, { fontSize: 13 * fontScale }]}>✕ {copy.cancelAmbulance}</Text>
+                </TouchableOpacity>
+              </View>
+            )}
           </View>
 
           {/* NOTE: greenTierBtn (I AM OKAY) removed — accessed via pain scale 1–3 */}
@@ -947,17 +1210,19 @@ export default function HomeScreen() {
             <TouchableOpacity
               style={styles.overdueCancel}
               onPress={() => {
+                // Stop any active speech and clear the repeating alarm interval
+                void Speech.stop();
                 if (overdueAlarm) {
                   clearInterval(overdueTimers.current[overdueAlarm.name]);
                   delete overdueTimers.current[overdueAlarm.name];
                 }
+                // Dismiss modal and fully reset alarm state
                 setOverdueAlarm(null);
-                speak('Reminder cancelled.');
               }}
               accessibilityRole="button"
               accessibilityLabel="Cancel overdue reminder"
             >
-              <Text style={styles.actionText}>✕ Cancel Reminder</Text>
+              <Text style={styles.actionText}>✕ {copy.cancelReminder}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -1144,7 +1409,7 @@ const styles = StyleSheet.create({
   // Trigger button with speaker
   triggerBtnWrap: { flex: 1, gap: 4 },
 
-  // ── Voice shortcut panel (judges demo panel) ──────────────────────────────────
+  // ── Voice shortcut panel ──────────────────────────────────────────────────
   voiceShortcutPanel: {
     backgroundColor: '#1a0a00',
     borderColor: '#d97706',
@@ -1165,6 +1430,24 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     padding: 8,
   },
+
+  // ── Voice trigger 4-step inline screens ──────────────────────────────────
+  voiceStepBox:  { gap: 12, alignItems: 'center', paddingVertical: 8 },
+  countdownBig:  { color: '#ff453a', fontWeight: '900', textAlign: 'center' },
+  aloneRow:      { flexDirection: 'row', gap: 12, alignSelf: 'stretch' },
+  aloneYesBtn:   { flex: 1, minHeight: 72, justifyContent: 'center', alignItems: 'center', backgroundColor: '#15803d', borderColor: '#4ade80', borderWidth: 3, borderRadius: 12 },
+  aloneNoBtn:    { flex: 1, minHeight: 72, justifyContent: 'center', alignItems: 'center', backgroundColor: '#991b1b', borderColor: '#ff453a', borderWidth: 3, borderRadius: 12 },
+  voiceCancelBtn:{ alignSelf: 'stretch', minHeight: 48, justifyContent: 'center', alignItems: 'center', backgroundColor: '#292524', borderColor: '#d97706', borderWidth: 1, borderRadius: 8, padding: 10, marginTop: 4 },
+  returnHomeBtn: { alignSelf: 'stretch', minHeight: 48, justifyContent: 'center', alignItems: 'center', backgroundColor: '#1e3a6e', borderColor: '#60a5fa', borderWidth: 1, borderRadius: 8, padding: 10 },
+
+  // ── Mic button ─────────────────────────────────────────────────────────────
+  micBtn:       { alignSelf: 'stretch', minHeight: 60, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, backgroundColor: '#1e293b', borderColor: '#475569', borderWidth: 2, borderRadius: 10, padding: 10 },
+  micBtnActive: { backgroundColor: '#0f3460', borderColor: '#3b82f6', borderWidth: 2 },
+  micBtnLabel:  { color: '#e2e8f0', fontWeight: '600' },
+
+  // ── Heard name row ─────────────────────────────────────────────────────────
+  heardNameRow:  { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#0f172a', borderRadius: 8, padding: 8 },
+  heardNameText: { color: '#93c5fd', fontWeight: '600', flex: 1 },
 
   // ── Dual mode toggle row ──────────────────────────────────────────────────
   modeToggleRow: {

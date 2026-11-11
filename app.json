@@ -8,7 +8,11 @@
     "scheme": "dischargebuddy",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "icon": "./assets/expo.icon"
+      "icon": "./assets/expo.icon",
+      "infoPlist": {
+        "NSSpeechRecognitionUsageDescription": "DischargeBuddy uses speech recognition to let you speak your name and emergency phrases hands-free.",
+        "NSMicrophoneUsageDescription": "DischargeBuddy uses the microphone for hands-free voice commands and emergency phrase detection."
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -18,7 +22,10 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "com.cbdelacruz02.DischargeBuddy"
+      "package": "com.cbdelacruz02.DischargeBuddy",
+      "permissions": [
+        "android.permission.RECORD_AUDIO"
+      ]
     },
     "web": {
       "output": "static",
@@ -32,6 +39,13 @@
           "backgroundColor": "#208AEF",
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 76
+        }
+      ],
+      [
+        "expo-speech-recognition",
+        {
+          "microphonePermission": "DischargeBuddy uses the microphone for hands-free voice commands.",
+          "speechRecognitionPermission": "DischargeBuddy uses speech recognition for emergency phrase detection."
         }
       ]
     ],

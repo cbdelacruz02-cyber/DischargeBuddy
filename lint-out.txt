@@ -1,0 +1,760 @@
+﻿
+C:\Users\cbdel\DischargeBuddy\src\app\alert.tsx
+  1:1  warning  Unexpected Unicode BOM (Byte Order Mark)  unicode-bom
+
+C:\Users\cbdel\DischargeBuddy\src\app\index.tsx
+  160:21  error  Error: Cannot access refs during render
+
+React refs are values that are not needed for rendering. Refs should only be accessed outside of render, such as in event handlers or effects. Accessing a ref value (the `current` property) during render can cause your component not to update as expected (https://react.dev/reference/react/useRef).
+
+C:\Users\cbdel\DischargeBuddy\src\app\index.tsx:160:21
+  158 |
+  159 |   // ΓöÇΓöÇ HELP button pulse animation ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+> 160 |   const helpPulse = useRef(new Animated.Value(1)).current;
+      |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Cannot access ref value during render
+  161 |   useEffect(() => {
+  162 |     const pulse = Animated.loop(
+  163 |       Animated.sequence([  react-hooks/refs
+  160:21  error  Error: Cannot access refs during render
+
+React refs are values that are not needed for rendering. Refs should only be accessed outside of render, such as in event handlers or effects. Accessing a ref value (the `current` property) during render can cause your component not to update as expected (https://react.dev/reference/react/useRef).
+
+C:\Users\cbdel\DischargeBuddy\src\app\index.tsx:160:21
+  158 |
+  159 |   // ΓöÇΓöÇ HELP button pulse animation ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+> 160 |   const helpPulse = useRef(new Animated.Value(1)).current;
+      |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Cannot access ref value during render
+  161 |   useEffect(() => {
+  162 |     const pulse = Animated.loop(
+  163 |       Animated.sequence([  react-hooks/refs
+  160:21  error  Error: Cannot access refs during render
+
+React refs are values that are not needed for rendering. Refs should only be accessed outside of render, such as in event handlers or effects. Accessing a ref value (the `current` property) during render can cause your component not to update as expected (https://react.dev/reference/react/useRef).
+
+C:\Users\cbdel\DischargeBuddy\src\app\index.tsx:160:21
+  158 |
+  159 |   // ΓöÇΓöÇ HELP button pulse animation ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+> 160 |   const helpPulse = useRef(new Animated.Value(1)).current;
+      |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Cannot access ref value during render
+  161 |   useEffect(() => {
+  162 |     const pulse = Animated.loop(
+  163 |       Animated.sequence([  react-hooks/refs
+  160:21  error  Error: Cannot access refs during render
+
+React refs are values that are not needed for rendering. Refs should only be accessed outside of render, such as in event handlers or effects. Accessing a ref value (the `current` property) during render can cause your component not to update as expected (https://react.dev/reference/react/useRef).
+
+C:\Users\cbdel\DischargeBuddy\src\app\index.tsx:160:21
+  158 |
+  159 |   // ΓöÇΓöÇ HELP button pulse animation ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+> 160 |   const helpPulse = useRef(new Animated.Value(1)).current;
+      |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Cannot access ref value during render
+  161 |   useEffect(() => {
+  162 |     const pulse = Animated.loop(
+  163 |       Animated.sequence([  react-hooks/refs
+  160:21  error  Error: Cannot access refs during render
+
+React refs are values that are not needed for rendering. Refs should only be accessed outside of render, such as in event handlers or effects. Accessing a ref value (the `current` property) during render can cause your component not to update as expected (https://react.dev/reference/react/useRef).
+
+C:\Users\cbdel\DischargeBuddy\src\app\index.tsx:160:21
+  158 |
+  159 |   // ΓöÇΓöÇ HELP button pulse animation ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+> 160 |   const helpPulse = useRef(new Animated.Value(1)).current;
+      |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Cannot access ref value during render
+  161 |   useEffect(() => {
+  162 |     const pulse = Animated.loop(
+  163 |       Animated.sequence([  react-hooks/refs
+  160:21  error  Error: Cannot access refs during render
+
+React refs are values that are not needed for rendering. Refs should only be accessed outside of render, such as in event handlers or effects. Accessing a ref value (the `current` property) during render can cause your component not to update as expected (https://react.dev/reference/react/useRef).
+
+C:\Users\cbdel\DischargeBuddy\src\app\index.tsx:160:21
+  158 |
+  159 |   // ΓöÇΓöÇ HELP button pulse animation ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+> 160 |   const helpPulse = useRef(new Animated.Value(1)).current;
+      |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Cannot access ref value during render
+  161 |   useEffect(() => {
+  162 |     const pulse = Animated.loop(
+  163 |       Animated.sequence([  react-hooks/refs
+
+C:\Users\cbdel\DischargeBuddy\src\components\NetworkGate.tsx
+  45:10  warning  'networkEnabled' is assigned a value but never used                                                                                @typescript-eslint/no-unused-vars
+  58:6   warning  React Hook useEffect has missing dependencies: 'speechRate' and 'voiceVolume'. Either include them or remove the dependency array  react-hooks/exhaustive-deps
+
+C:\Users\cbdel\DischargeBuddy\src\components\emergency-flow.tsx
+   254:24   error    Error: Cannot access refs during render
+
+React refs are values that are not needed for rendering. Refs should only be accessed outside of render, such as in event handlers or effects. Accessing a ref value (the `current` property) during render can cause your component not to update as expected (https://react.dev/reference/react/useRef).
+
+C:\Users\cbdel\DischargeBuddy\src\components\emergency-flow.tsx:254:24
+  252 |
+  253 |   // ΓöÇΓöÇ Animation refs ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+> 254 |   const pulse        = useRef(new Animated.Value(1)).current;
+      |                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Cannot access ref value during render
+  255 |   const frameFlash   = useRef(new Animated.Value(0.2)).current;
+  256 |   const wavePulse    = useRef(new Animated.Value(1)).current;
+  257 |   const globeRotate  = useRef(new Animated.Value(0)).current;  // Yellow globe spin                                                                                                                                                                                                                                                                                                                              react-hooks/refs
+   254:24   error    Error: Cannot access refs during render
+
+React refs are values that are not needed for rendering. Refs should only be accessed outside of render, such as in event handlers or effects. Accessing a ref value (the `current` property) during render can cause your component not to update as expected (https://react.dev/reference/react/useRef).
+
+C:\Users\cbdel\DischargeBuddy\src\components\emergency-flow.tsx:254:24
+  252 |
+  253 |   // ΓöÇΓöÇ Animation refs ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+> 254 |   const pulse        = useRef(new Animated.Value(1)).current;
+      |                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Cannot access ref value during render
+  255 |   const frameFlash   = useRef(new Animated.Value(0.2)).current;
+  256 |   const wavePulse    = useRef(new Animated.Value(1)).current;
+  257 |   const globeRotate  = useRef(new Animated.Value(0)).current;  // Yellow globe spin                                                                                                                                                                                                                                                                                                                              react-hooks/refs
+   254:24   error    Error: Cannot access refs during render
+
+React refs are values that are not needed for rendering. Refs should only be accessed outside of render, such as in event handlers or effects. Accessing a ref value (the `current` property) during render can cause your component not to update as expected (https://react.dev/reference/react/useRef).
+
+C:\Users\cbdel\DischargeBuddy\src\components\emergency-flow.tsx:254:24
+  252 |
+  253 |   // ΓöÇΓöÇ Animation refs ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+> 254 |   const pulse        = useRef(new Animated.Value(1)).current;
+      |                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Cannot access ref value during render
+  255 |   const frameFlash   = useRef(new Animated.Value(0.2)).current;
+  256 |   const wavePulse    = useRef(new Animated.Value(1)).current;
+  257 |   const globeRotate  = useRef(new Animated.Value(0)).current;  // Yellow globe spin                                                                                                                                                                                                                                                                                                                              react-hooks/refs
+   254:24   error    Error: Cannot access refs during render
+
+React refs are values that are not needed for rendering. Refs should only be accessed outside of render, such as in event handlers or effects. Accessing a ref value (the `current` property) during render can cause your component not to update as expected (https://react.dev/reference/react/useRef).
+
+C:\Users\cbdel\DischargeBuddy\src\components\emergency-flow.tsx:254:24
+  252 |
+  253 |   // ΓöÇΓöÇ Animation refs ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+> 254 |   const pulse        = useRef(new Animated.Value(1)).current;
+      |                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Cannot access ref value during render
+  255 |   const frameFlash   = useRef(new Animated.Value(0.2)).current;
+  256 |   const wavePulse    = useRef(new Animated.Value(1)).current;
+  257 |   const globeRotate  = useRef(new Animated.Value(0)).current;  // Yellow globe spin                                                                                                                                                                                                                                                                                                                              react-hooks/refs
+   254:24   error    Error: Cannot access refs during render
+
+React refs are values that are not needed for rendering. Refs should only be accessed outside of render, such as in event handlers or effects. Accessing a ref value (the `current` property) during render can cause your component not to update as expected (https://react.dev/reference/react/useRef).
+
+C:\Users\cbdel\DischargeBuddy\src\components\emergency-flow.tsx:254:24
+  252 |
+  253 |   // ΓöÇΓöÇ Animation refs ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+> 254 |   const pulse        = useRef(new Animated.Value(1)).current;
+      |                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Cannot access ref value during render
+  255 |   const frameFlash   = useRef(new Animated.Value(0.2)).current;
+  256 |   const wavePulse    = useRef(new Animated.Value(1)).current;
+  257 |   const globeRotate  = useRef(new Animated.Value(0)).current;  // Yellow globe spin                                                                                                                                                                                                                                                                                                                              react-hooks/refs
+   254:24   error    Error: Cannot access refs during render
+
+React refs are values that are not needed for rendering. Refs should only be accessed outside of render, such as in event handlers or effects. Accessing a ref value (the `current` property) during render can cause your component not to update as expected (https://react.dev/reference/react/useRef).
+
+C:\Users\cbdel\DischargeBuddy\src\components\emergency-flow.tsx:254:24
+  252 |
+  253 |   // ΓöÇΓöÇ Animation refs ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+> 254 |   const pulse        = useRef(new Animated.Value(1)).current;
+      |                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Cannot access ref value during render
+  255 |   const frameFlash   = useRef(new Animated.Value(0.2)).current;
+  256 |   const wavePulse    = useRef(new Animated.Value(1)).current;
+  257 |   const globeRotate  = useRef(new Animated.Value(0)).current;  // Yellow globe spin                                                                                                                                                                                                                                                                                                                              react-hooks/refs
+   254:24   error    Error: Cannot access refs during render
+
+React refs are values that are not needed for rendering. Refs should only be accessed outside of render, such as in event handlers or effects. Accessing a ref value (the `current` property) during render can cause your component not to update as expected (https://react.dev/reference/react/useRef).
+
+C:\Users\cbdel\DischargeBuddy\src\components\emergency-flow.tsx:254:24
+  252 |
+  253 |   // ΓöÇΓöÇ Animation refs ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+> 254 |   const pulse        = useRef(new Animated.Value(1)).current;
+      |                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Cannot access ref value during render
+  255 |   const frameFlash   = useRef(new Animated.Value(0.2)).current;
+  256 |   const wavePulse    = useRef(new Animated.Value(1)).current;
+  257 |   const globeRotate  = useRef(new Animated.Value(0)).current;  // Yellow globe spin                                                                                                                                                                                                                                                                                                                              react-hooks/refs
+   254:24   error    Error: Cannot access refs during render
+
+React refs are values that are not needed for rendering. Refs should only be accessed outside of render, such as in event handlers or effects. Accessing a ref value (the `current` property) during render can cause your component not to update as expected (https://react.dev/reference/react/useRef).
+
+C:\Users\cbdel\DischargeBuddy\src\components\emergency-flow.tsx:254:24
+  252 |
+  253 |   // ΓöÇΓöÇ Animation refs ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+> 254 |   const pulse        = useRef(new Animated.Value(1)).current;
+      |                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Cannot access ref value during render
+  255 |   const frameFlash   = useRef(new Animated.Value(0.2)).current;
+  256 |   const wavePulse    = useRef(new Animated.Value(1)).current;
+  257 |   const globeRotate  = useRef(new Animated.Value(0)).current;  // Yellow globe spin                                                                                                                                                                                                                                                                                                                              react-hooks/refs
+   254:24   error    Error: Cannot access refs during render
+
+React refs are values that are not needed for rendering. Refs should only be accessed outside of render, such as in event handlers or effects. Accessing a ref value (the `current` property) during render can cause your component not to update as expected (https://react.dev/reference/react/useRef).
+
+C:\Users\cbdel\DischargeBuddy\src\components\emergency-flow.tsx:254:24
+  252 |
+  253 |   // ΓöÇΓöÇ Animation refs ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+> 254 |   const pulse        = useRef(new Animated.Value(1)).current;
+      |                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Cannot access ref value during render
+  255 |   const frameFlash   = useRef(new Animated.Value(0.2)).current;
+  256 |   const wavePulse    = useRef(new Animated.Value(1)).current;
+  257 |   const globeRotate  = useRef(new Animated.Value(0)).current;  // Yellow globe spin                                                                                                                                                                                                                                                                                                                              react-hooks/refs
+   254:24   error    Error: Cannot access refs during render
+
+React refs are values that are not needed for rendering. Refs should only be accessed outside of render, such as in event handlers or effects. Accessing a ref value (the `current` property) during render can cause your component not to update as expected (https://react.dev/reference/react/useRef).
+
+C:\Users\cbdel\DischargeBuddy\src\components\emergency-flow.tsx:254:24
+  252 |
+  253 |   // ΓöÇΓöÇ Animation refs ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+> 254 |   const pulse        = useRef(new Animated.Value(1)).current;
+      |                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Cannot access ref value during render
+  255 |   const frameFlash   = useRef(new Animated.Value(0.2)).current;
+  256 |   const wavePulse    = useRef(new Animated.Value(1)).current;
+  257 |   const globeRotate  = useRef(new Animated.Value(0)).current;  // Yellow globe spin                                                                                                                                                                                                                                                                                                                              react-hooks/refs
+   254:24   error    Error: Cannot access refs during render
+
+React refs are values that are not needed for rendering. Refs should only be accessed outside of render, such as in event handlers or effects. Accessing a ref value (the `current` property) during render can cause your component not to update as expected (https://react.dev/reference/react/useRef).
+
+C:\Users\cbdel\DischargeBuddy\src\components\emergency-flow.tsx:254:24
+  252 |
+  253 |   // ΓöÇΓöÇ Animation refs ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+> 254 |   const pulse        = useRef(new Animated.Value(1)).current;
+      |                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Cannot access ref value during render
+  255 |   const frameFlash   = useRef(new Animated.Value(0.2)).current;
+  256 |   const wavePulse    = useRef(new Animated.Value(1)).current;
+  257 |   const globeRotate  = useRef(new Animated.Value(0)).current;  // Yellow globe spin                                                                                                                                                                                                                                                                                                                              react-hooks/refs
+   254:24   error    Error: Cannot access refs during render
+
+React refs are values that are not needed for rendering. Refs should only be accessed outside of render, such as in event handlers or effects. Accessing a ref value (the `current` property) during render can cause your component not to update as expected (https://react.dev/reference/react/useRef).
+
+C:\Users\cbdel\DischargeBuddy\src\components\emergency-flow.tsx:254:24
+  252 |
+  253 |   // ΓöÇΓöÇ Animation refs ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+> 254 |   const pulse        = useRef(new Animated.Value(1)).current;
+      |                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Cannot access ref value during render
+  255 |   const frameFlash   = useRef(new Animated.Value(0.2)).current;
+  256 |   const wavePulse    = useRef(new Animated.Value(1)).current;
+  257 |   const globeRotate  = useRef(new Animated.Value(0)).current;  // Yellow globe spin                                                                                                                                                                                                                                                                                                                              react-hooks/refs
+   255:24   error    Error: Cannot access refs during render
+
+React refs are values that are not needed for rendering. Refs should only be accessed outside of render, such as in event handlers or effects. Accessing a ref value (the `current` property) during render can cause your component not to update as expected (https://react.dev/reference/react/useRef).
+
+C:\Users\cbdel\DischargeBuddy\src\components\emergency-flow.tsx:255:24
+  253 |   // ΓöÇΓöÇ Animation refs ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+  254 |   const pulse        = useRef(new Animated.Value(1)).current;
+> 255 |   const frameFlash   = useRef(new Animated.Value(0.2)).current;
+      |                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Cannot access ref value during render
+  256 |   const wavePulse    = useRef(new Animated.Value(1)).current;
+  257 |   const globeRotate  = useRef(new Animated.Value(0)).current;  // Yellow globe spin
+  258 |   const silenceWidth = useRef(new Animated.Value(1)).current;                                                                                                                                                                                                                                                              react-hooks/refs
+   255:24   error    Error: Cannot access refs during render
+
+React refs are values that are not needed for rendering. Refs should only be accessed outside of render, such as in event handlers or effects. Accessing a ref value (the `current` property) during render can cause your component not to update as expected (https://react.dev/reference/react/useRef).
+
+C:\Users\cbdel\DischargeBuddy\src\components\emergency-flow.tsx:255:24
+  253 |   // ΓöÇΓöÇ Animation refs ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+  254 |   const pulse        = useRef(new Animated.Value(1)).current;
+> 255 |   const frameFlash   = useRef(new Animated.Value(0.2)).current;
+      |                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Cannot access ref value during render
+  256 |   const wavePulse    = useRef(new Animated.Value(1)).current;
+  257 |   const globeRotate  = useRef(new Animated.Value(0)).current;  // Yellow globe spin
+  258 |   const silenceWidth = useRef(new Animated.Value(1)).current;                                                                                                                                                                                                                                                              react-hooks/refs
+   256:24   error    Error: Cannot access refs during render
+
+React refs are values that are not needed for rendering. Refs should only be accessed outside of render, such as in event handlers or effects. Accessing a ref value (the `current` property) during render can cause your component not to update as expected (https://react.dev/reference/react/useRef).
+
+C:\Users\cbdel\DischargeBuddy\src\components\emergency-flow.tsx:256:24
+  254 |   const pulse        = useRef(new Animated.Value(1)).current;
+  255 |   const frameFlash   = useRef(new Animated.Value(0.2)).current;
+> 256 |   const wavePulse    = useRef(new Animated.Value(1)).current;
+      |                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Cannot access ref value during render
+  257 |   const globeRotate  = useRef(new Animated.Value(0)).current;  // Yellow globe spin
+  258 |   const silenceWidth = useRef(new Animated.Value(1)).current;
+  259 |                                                                                                                                                                                                                                                                                                                                                 react-hooks/refs
+   256:24   error    Error: Cannot access refs during render
+
+React refs are values that are not needed for rendering. Refs should only be accessed outside of render, such as in event handlers or effects. Accessing a ref value (the `current` property) during render can cause your component not to update as expected (https://react.dev/reference/react/useRef).
+
+C:\Users\cbdel\DischargeBuddy\src\components\emergency-flow.tsx:256:24
+  254 |   const pulse        = useRef(new Animated.Value(1)).current;
+  255 |   const frameFlash   = useRef(new Animated.Value(0.2)).current;
+> 256 |   const wavePulse    = useRef(new Animated.Value(1)).current;
+      |                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Cannot access ref value during render
+  257 |   const globeRotate  = useRef(new Animated.Value(0)).current;  // Yellow globe spin
+  258 |   const silenceWidth = useRef(new Animated.Value(1)).current;
+  259 |                                                                                                                                                                                                                                                                                                                                                 react-hooks/refs
+   256:24   error    Error: Cannot access refs during render
+
+React refs are values that are not needed for rendering. Refs should only be accessed outside of render, such as in event handlers or effects. Accessing a ref value (the `current` property) during render can cause your component not to update as expected (https://react.dev/reference/react/useRef).
+
+C:\Users\cbdel\DischargeBuddy\src\components\emergency-flow.tsx:256:24
+  254 |   const pulse        = useRef(new Animated.Value(1)).current;
+  255 |   const frameFlash   = useRef(new Animated.Value(0.2)).current;
+> 256 |   const wavePulse    = useRef(new Animated.Value(1)).current;
+      |                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Cannot access ref value during render
+  257 |   const globeRotate  = useRef(new Animated.Value(0)).current;  // Yellow globe spin
+  258 |   const silenceWidth = useRef(new Animated.Value(1)).current;
+  259 |                                                                                                                                                                                                                                                                                                                                                 react-hooks/refs
+   256:24   error    Error: Cannot access refs during render
+
+React refs are values that are not needed for rendering. Refs should only be accessed outside of render, such as in event handlers or effects. Accessing a ref value (the `current` property) during render can cause your component not to update as expected (https://react.dev/reference/react/useRef).
+
+C:\Users\cbdel\DischargeBuddy\src\components\emergency-flow.tsx:256:24
+  254 |   const pulse        = useRef(new Animated.Value(1)).current;
+  255 |   const frameFlash   = useRef(new Animated.Value(0.2)).current;
+> 256 |   const wavePulse    = useRef(new Animated.Value(1)).current;
+      |                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Cannot access ref value during render
+  257 |   const globeRotate  = useRef(new Animated.Value(0)).current;  // Yellow globe spin
+  258 |   const silenceWidth = useRef(new Animated.Value(1)).current;
+  259 |                                                                                                                                                                                                                                                                                                                                                 react-hooks/refs
+   256:24   error    Error: Cannot access refs during render
+
+React refs are values that are not needed for rendering. Refs should only be accessed outside of render, such as in event handlers or effects. Accessing a ref value (the `current` property) during render can cause your component not to update as expected (https://react.dev/reference/react/useRef).
+
+C:\Users\cbdel\DischargeBuddy\src\components\emergency-flow.tsx:256:24
+  254 |   const pulse        = useRef(new Animated.Value(1)).current;
+  255 |   const frameFlash   = useRef(new Animated.Value(0.2)).current;
+> 256 |   const wavePulse    = useRef(new Animated.Value(1)).current;
+      |                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Cannot access ref value during render
+  257 |   const globeRotate  = useRef(new Animated.Value(0)).current;  // Yellow globe spin
+  258 |   const silenceWidth = useRef(new Animated.Value(1)).current;
+  259 |                                                                                                                                                                                                                                                                                                                                                 react-hooks/refs
+   256:24   error    Error: Cannot access refs during render
+
+React refs are values that are not needed for rendering. Refs should only be accessed outside of render, such as in event handlers or effects. Accessing a ref value (the `current` property) during render can cause your component not to update as expected (https://react.dev/reference/react/useRef).
+
+C:\Users\cbdel\DischargeBuddy\src\components\emergency-flow.tsx:256:24
+  254 |   const pulse        = useRef(new Animated.Value(1)).current;
+  255 |   const frameFlash   = useRef(new Animated.Value(0.2)).current;
+> 256 |   const wavePulse    = useRef(new Animated.Value(1)).current;
+      |                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Cannot access ref value during render
+  257 |   const globeRotate  = useRef(new Animated.Value(0)).current;  // Yellow globe spin
+  258 |   const silenceWidth = useRef(new Animated.Value(1)).current;
+  259 |                                                                                                                                                                                                                                                                                                                                                 react-hooks/refs
+   256:24   error    Error: Cannot access refs during render
+
+React refs are values that are not needed for rendering. Refs should only be accessed outside of render, such as in event handlers or effects. Accessing a ref value (the `current` property) during render can cause your component not to update as expected (https://react.dev/reference/react/useRef).
+
+C:\Users\cbdel\DischargeBuddy\src\components\emergency-flow.tsx:256:24
+  254 |   const pulse        = useRef(new Animated.Value(1)).current;
+  255 |   const frameFlash   = useRef(new Animated.Value(0.2)).current;
+> 256 |   const wavePulse    = useRef(new Animated.Value(1)).current;
+      |                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Cannot access ref value during render
+  257 |   const globeRotate  = useRef(new Animated.Value(0)).current;  // Yellow globe spin
+  258 |   const silenceWidth = useRef(new Animated.Value(1)).current;
+  259 |                                                                                                                                                                                                                                                                                                                                                 react-hooks/refs
+   256:24   error    Error: Cannot access refs during render
+
+React refs are values that are not needed for rendering. Refs should only be accessed outside of render, such as in event handlers or effects. Accessing a ref value (the `current` property) during render can cause your component not to update as expected (https://react.dev/reference/react/useRef).
+
+C:\Users\cbdel\DischargeBuddy\src\components\emergency-flow.tsx:256:24
+  254 |   const pulse        = useRef(new Animated.Value(1)).current;
+  255 |   const frameFlash   = useRef(new Animated.Value(0.2)).current;
+> 256 |   const wavePulse    = useRef(new Animated.Value(1)).current;
+      |                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Cannot access ref value during render
+  257 |   const globeRotate  = useRef(new Animated.Value(0)).current;  // Yellow globe spin
+  258 |   const silenceWidth = useRef(new Animated.Value(1)).current;
+  259 |                                                                                                                                                                                                                                                                                                                                                 react-hooks/refs
+   256:24   error    Error: Cannot access refs during render
+
+React refs are values that are not needed for rendering. Refs should only be accessed outside of render, such as in event handlers or effects. Accessing a ref value (the `current` property) during render can cause your component not to update as expected (https://react.dev/reference/react/useRef).
+
+C:\Users\cbdel\DischargeBuddy\src\components\emergency-flow.tsx:256:24
+  254 |   const pulse        = useRef(new Animated.Value(1)).current;
+  255 |   const frameFlash   = useRef(new Animated.Value(0.2)).current;
+> 256 |   const wavePulse    = useRef(new Animated.Value(1)).current;
+      |                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Cannot access ref value during render
+  257 |   const globeRotate  = useRef(new Animated.Value(0)).current;  // Yellow globe spin
+  258 |   const silenceWidth = useRef(new Animated.Value(1)).current;
+  259 |                                                                                                                                                                                                                                                                                                                                                 react-hooks/refs
+   256:24   error    Error: Cannot access refs during render
+
+React refs are values that are not needed for rendering. Refs should only be accessed outside of render, such as in event handlers or effects. Accessing a ref value (the `current` property) during render can cause your component not to update as expected (https://react.dev/reference/react/useRef).
+
+C:\Users\cbdel\DischargeBuddy\src\components\emergency-flow.tsx:256:24
+  254 |   const pulse        = useRef(new Animated.Value(1)).current;
+  255 |   const frameFlash   = useRef(new Animated.Value(0.2)).current;
+> 256 |   const wavePulse    = useRef(new Animated.Value(1)).current;
+      |                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Cannot access ref value during render
+  257 |   const globeRotate  = useRef(new Animated.Value(0)).current;  // Yellow globe spin
+  258 |   const silenceWidth = useRef(new Animated.Value(1)).current;
+  259 |                                                                                                                                                                                                                                                                                                                                                 react-hooks/refs
+   256:24   error    Error: Cannot access refs during render
+
+React refs are values that are not needed for rendering. Refs should only be accessed outside of render, such as in event handlers or effects. Accessing a ref value (the `current` property) during render can cause your component not to update as expected (https://react.dev/reference/react/useRef).
+
+C:\Users\cbdel\DischargeBuddy\src\components\emergency-flow.tsx:256:24
+  254 |   const pulse        = useRef(new Animated.Value(1)).current;
+  255 |   const frameFlash   = useRef(new Animated.Value(0.2)).current;
+> 256 |   const wavePulse    = useRef(new Animated.Value(1)).current;
+      |                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Cannot access ref value during render
+  257 |   const globeRotate  = useRef(new Animated.Value(0)).current;  // Yellow globe spin
+  258 |   const silenceWidth = useRef(new Animated.Value(1)).current;
+  259 |                                                                                                                                                                                                                                                                                                                                                 react-hooks/refs
+   256:24   error    Error: Cannot access refs during render
+
+React refs are values that are not needed for rendering. Refs should only be accessed outside of render, such as in event handlers or effects. Accessing a ref value (the `current` property) during render can cause your component not to update as expected (https://react.dev/reference/react/useRef).
+
+C:\Users\cbdel\DischargeBuddy\src\components\emergency-flow.tsx:256:24
+  254 |   const pulse        = useRef(new Animated.Value(1)).current;
+  255 |   const frameFlash   = useRef(new Animated.Value(0.2)).current;
+> 256 |   const wavePulse    = useRef(new Animated.Value(1)).current;
+      |                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Cannot access ref value during render
+  257 |   const globeRotate  = useRef(new Animated.Value(0)).current;  // Yellow globe spin
+  258 |   const silenceWidth = useRef(new Animated.Value(1)).current;
+  259 |                                                                                                                                                                                                                                                                                                                                                 react-hooks/refs
+   256:24   error    Error: Cannot access refs during render
+
+React refs are values that are not needed for rendering. Refs should only be accessed outside of render, such as in event handlers or effects. Accessing a ref value (the `current` property) during render can cause your component not to update as expected (https://react.dev/reference/react/useRef).
+
+C:\Users\cbdel\DischargeBuddy\src\components\emergency-flow.tsx:256:24
+  254 |   const pulse        = useRef(new Animated.Value(1)).current;
+  255 |   const frameFlash   = useRef(new Animated.Value(0.2)).current;
+> 256 |   const wavePulse    = useRef(new Animated.Value(1)).current;
+      |                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Cannot access ref value during render
+  257 |   const globeRotate  = useRef(new Animated.Value(0)).current;  // Yellow globe spin
+  258 |   const silenceWidth = useRef(new Animated.Value(1)).current;
+  259 |                                                                                                                                                                                                                                                                                                                                                 react-hooks/refs
+   256:24   error    Error: Cannot access refs during render
+
+React refs are values that are not needed for rendering. Refs should only be accessed outside of render, such as in event handlers or effects. Accessing a ref value (the `current` property) during render can cause your component not to update as expected (https://react.dev/reference/react/useRef).
+
+C:\Users\cbdel\DischargeBuddy\src\components\emergency-flow.tsx:256:24
+  254 |   const pulse        = useRef(new Animated.Value(1)).current;
+  255 |   const frameFlash   = useRef(new Animated.Value(0.2)).current;
+> 256 |   const wavePulse    = useRef(new Animated.Value(1)).current;
+      |                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Cannot access ref value during render
+  257 |   const globeRotate  = useRef(new Animated.Value(0)).current;  // Yellow globe spin
+  258 |   const silenceWidth = useRef(new Animated.Value(1)).current;
+  259 |                                                                                                                                                                                                                                                                                                                                                 react-hooks/refs
+   256:24   error    Error: Cannot access refs during render
+
+React refs are values that are not needed for rendering. Refs should only be accessed outside of render, such as in event handlers or effects. Accessing a ref value (the `current` property) during render can cause your component not to update as expected (https://react.dev/reference/react/useRef).
+
+C:\Users\cbdel\DischargeBuddy\src\components\emergency-flow.tsx:256:24
+  254 |   const pulse        = useRef(new Animated.Value(1)).current;
+  255 |   const frameFlash   = useRef(new Animated.Value(0.2)).current;
+> 256 |   const wavePulse    = useRef(new Animated.Value(1)).current;
+      |                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Cannot access ref value during render
+  257 |   const globeRotate  = useRef(new Animated.Value(0)).current;  // Yellow globe spin
+  258 |   const silenceWidth = useRef(new Animated.Value(1)).current;
+  259 |                                                                                                                                                                                                                                                                                                                                                 react-hooks/refs
+   256:24   error    Error: Cannot access refs during render
+
+React refs are values that are not needed for rendering. Refs should only be accessed outside of render, such as in event handlers or effects. Accessing a ref value (the `current` property) during render can cause your component not to update as expected (https://react.dev/reference/react/useRef).
+
+C:\Users\cbdel\DischargeBuddy\src\components\emergency-flow.tsx:256:24
+  254 |   const pulse        = useRef(new Animated.Value(1)).current;
+  255 |   const frameFlash   = useRef(new Animated.Value(0.2)).current;
+> 256 |   const wavePulse    = useRef(new Animated.Value(1)).current;
+      |                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Cannot access ref value during render
+  257 |   const globeRotate  = useRef(new Animated.Value(0)).current;  // Yellow globe spin
+  258 |   const silenceWidth = useRef(new Animated.Value(1)).current;
+  259 |                                                                                                                                                                                                                                                                                                                                                 react-hooks/refs
+   256:24   error    Error: Cannot access refs during render
+
+React refs are values that are not needed for rendering. Refs should only be accessed outside of render, such as in event handlers or effects. Accessing a ref value (the `current` property) during render can cause your component not to update as expected (https://react.dev/reference/react/useRef).
+
+C:\Users\cbdel\DischargeBuddy\src\components\emergency-flow.tsx:256:24
+  254 |   const pulse        = useRef(new Animated.Value(1)).current;
+  255 |   const frameFlash   = useRef(new Animated.Value(0.2)).current;
+> 256 |   const wavePulse    = useRef(new Animated.Value(1)).current;
+      |                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Cannot access ref value during render
+  257 |   const globeRotate  = useRef(new Animated.Value(0)).current;  // Yellow globe spin
+  258 |   const silenceWidth = useRef(new Animated.Value(1)).current;
+  259 |                                                                                                                                                                                                                                                                                                                                                 react-hooks/refs
+   257:24   error    Error: Cannot access refs during render
+
+React refs are values that are not needed for rendering. Refs should only be accessed outside of render, such as in event handlers or effects. Accessing a ref value (the `current` property) during render can cause your component not to update as expected (https://react.dev/reference/react/useRef).
+
+C:\Users\cbdel\DischargeBuddy\src\components\emergency-flow.tsx:257:24
+  255 |   const frameFlash   = useRef(new Animated.Value(0.2)).current;
+  256 |   const wavePulse    = useRef(new Animated.Value(1)).current;
+> 257 |   const globeRotate  = useRef(new Animated.Value(0)).current;  // Yellow globe spin
+      |                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Cannot access ref value during render
+  258 |   const silenceWidth = useRef(new Animated.Value(1)).current;
+  259 |
+  260 |   // ΓöÇΓöÇ TTS dedup guard ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ                                                                                                                                                                                                                                                                                                                              react-hooks/refs
+   257:24   error    Error: Cannot access refs during render
+
+React refs are values that are not needed for rendering. Refs should only be accessed outside of render, such as in event handlers or effects. Accessing a ref value (the `current` property) during render can cause your component not to update as expected (https://react.dev/reference/react/useRef).
+
+C:\Users\cbdel\DischargeBuddy\src\components\emergency-flow.tsx:257:24
+  255 |   const frameFlash   = useRef(new Animated.Value(0.2)).current;
+  256 |   const wavePulse    = useRef(new Animated.Value(1)).current;
+> 257 |   const globeRotate  = useRef(new Animated.Value(0)).current;  // Yellow globe spin
+      |                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Cannot access ref value during render
+  258 |   const silenceWidth = useRef(new Animated.Value(1)).current;
+  259 |
+  260 |   // ΓöÇΓöÇ TTS dedup guard ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ                                                                                                                                                                                                                                                                                                                              react-hooks/refs
+   367:36   error    Compilation Skipped: Existing memoization could not be preserved
+
+React Compiler has skipped optimizing this component because the existing manual memoization could not be preserved. The inferred dependencies did not match the manually specified dependencies, which could cause the value to change more or less frequently than expected. The inferred dependency was `setShowCloudPrompt`, but the source dependencies were [isStandalone, speak]. Inferred different dependency than source.
+
+C:\Users\cbdel\DischargeBuddy\src\components\emergency-flow.tsx:367:36
+  365 |   }, [onStandaloneChange]);
+  366 |
+> 367 |   const requireCloud = useCallback((actionLabel: string, proceed: () => void) => {
+      |                                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 368 |     if (!isStandalone) {
+      | ^^^^^^^^^^^^^^^^^^^^^^^^
+> 369 |       proceed();
+      ΓÇª
+      | ^^^^^^^^^^^^^^^^^^^^^^^^
+> 378 |     );
+      | ^^^^^^^^^^^^^^^^^^^^^^^^
+> 379 |   }, [isStandalone, speak]);
+      | ^^^^ Could not preserve existing manual memoization
+  380 |
+  381 |   // ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+  382 |   // softChime ΓÇö plays a soft triple-tone vibration sequence as a chime  react-hooks/preserve-manual-memoization
+   443:5    warning  Unused eslint-disable directive (no problems were reported from 'react-hooks/exhaustive-deps')
+   486:7    error    Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+C:\Users\cbdel\DischargeBuddy\src\components\emergency-flow.tsx:486:7
+  484 |     if (pauseSeconds === 0) {
+  485 |       spokenPhase.current = null;
+> 486 |       setPhase('pain');          // Framework ┬º1: boot directly to pain assessment
+      |       ^^^^^^^^ Avoid calling setState() directly within an effect
+  487 |       return;
+  488 |     }
+  489 |     const t = setTimeout(() => setPauseSeconds((v: number) => v - 1), 1000);                                                                                                               react-hooks/set-state-in-effect
+   491:5    warning  Unused eslint-disable directive (no problems were reported from 'react-hooks/exhaustive-deps')
+   501:7    error    Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+C:\Users\cbdel\DischargeBuddy\src\components\emergency-flow.tsx:501:7
+  499 |     if (interSeconds === 0 && nextPhase !== null) {
+  500 |       const target = nextPhase;
+> 501 |       setNextPhase(null);
+      |       ^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  502 |       setPhase(target);
+  503 |       return;
+  504 |     }                                                                                                                                                                                                     react-hooks/set-state-in-effect
+   836:7    error    Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+C:\Users\cbdel\DischargeBuddy\src\components\emergency-flow.tsx:836:7
+  834 |     const cfg = SILENCE_PHASE_MAP[phase as Phase];
+  835 |     if (!cfg) {
+> 836 |       setSilenceActive(false);
+      |       ^^^^^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  837 |       setSilenceLeft(10);
+  838 |       setSilenceCap(10);
+  839 |       silenceWidth.setValue(1);                                                                                                                                                                      react-hooks/set-state-in-effect
+   923:7    error    Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+C:\Users\cbdel\DischargeBuddy\src\components\emergency-flow.tsx:923:7
+  921 |   useEffect(() => {
+  922 |     if (phase === 'pain-escalation') {
+> 923 |       setPainEscalationCountdown(5);
+      |       ^^^^^^^^^^^^^^^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  924 |     }
+  925 |     // eslint-disable-next-line react-hooks/exhaustive-deps
+  926 |   }, [phase]);                                                                                                                                                                react-hooks/set-state-in-effect
+   925:5    warning  Unused eslint-disable directive (no problems were reported from 'react-hooks/exhaustive-deps')
+  1037:3    warning  Unused eslint-disable directive (no problems were reported from 'react-hooks/exhaustive-deps')
+  1066:9    warning  'handlePainScore' is assigned a value but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 @typescript-eslint/no-unused-vars
+  1127:21   error    Error: Cannot access refs during render
+
+React refs are values that are not needed for rendering. Refs should only be accessed outside of render, such as in event handlers or effects. Accessing a ref value (the `current` property) during render can cause your component not to update as expected (https://react.dev/reference/react/useRef).
+
+C:\Users\cbdel\DischargeBuddy\src\components\emergency-flow.tsx:1127:21
+  1125 |   // Globe rotation interpolation (degrees 0ΓåÆ360)
+  1126 |   // ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+> 1127 |   const globeSpin = globeRotate.interpolate({
+       |                     ^^^^^^^^^^^ Passing a ref to a function may read its value during render
+  1128 |     inputRange: [0, 1],
+  1129 |     outputRange: ['0deg', '360deg'],
+  1130 |   });                                                                                                                                                                                                                                                                                                                                                                                                                                           react-hooks/refs
+  1127:21   error    Error: Cannot access refs during render
+
+React refs are values that are not needed for rendering. Refs should only be accessed outside of render, such as in event handlers or effects. Accessing a ref value (the `current` property) during render can cause your component not to update as expected (https://react.dev/reference/react/useRef).
+
+C:\Users\cbdel\DischargeBuddy\src\components\emergency-flow.tsx:1127:21
+  1125 |   // Globe rotation interpolation (degrees 0ΓåÆ360)
+  1126 |   // ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+> 1127 |   const globeSpin = globeRotate.interpolate({
+       |                     ^^^^^^^^^^^^^^^^^^^^^^^ Passing a ref to a function may read its value during render
+  1128 |     inputRange: [0, 1],
+  1129 |     outputRange: ['0deg', '360deg'],
+  1130 |   });                                                                                                                                                                                                                                                                                                                                                                                                                               react-hooks/refs
+  1173:22   error    Error: Cannot access refs during render
+
+React refs are values that are not needed for rendering. Refs should only be accessed outside of render, such as in event handlers or effects. Accessing a ref value (the `current` property) during render can cause your component not to update as expected (https://react.dev/reference/react/useRef).
+
+C:\Users\cbdel\DischargeBuddy\src\components\emergency-flow.tsx:1173:22
+  1171 |             styles.silenceFill,
+  1172 |             {
+> 1173 |               width: silenceWidth.interpolate({
+       |                      ^^^^^^^^^^^^ Passing a ref to a function may read its value during render
+  1174 |                 inputRange: [0, 1],
+  1175 |                 outputRange: ['0%', '100%'],
+  1176 |               }),                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          react-hooks/refs
+  1173:22   error    Error: Cannot access refs during render
+
+React refs are values that are not needed for rendering. Refs should only be accessed outside of render, such as in event handlers or effects. Accessing a ref value (the `current` property) during render can cause your component not to update as expected (https://react.dev/reference/react/useRef).
+
+C:\Users\cbdel\DischargeBuddy\src\components\emergency-flow.tsx:1173:22
+  1171 |             styles.silenceFill,
+  1172 |             {
+> 1173 |               width: silenceWidth.interpolate({
+       |                      ^^^^^^^^^^^^^^^^^^^^^^^^ Passing a ref to a function may read its value during render
+  1174 |                 inputRange: [0, 1],
+  1175 |                 outputRange: ['0%', '100%'],
+  1176 |               }),                                                                                                                                                                                                                                                                                                                                                                                                                                                                              react-hooks/refs
+  1680:93   error    `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      react/no-unescaped-entities
+  1680:106  error    `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      react/no-unescaped-entities
+  1683:55   error    Error: Cannot access refs during render
+
+React refs are values that are not needed for rendering. Refs should only be accessed outside of render, such as in event handlers or effects. Accessing a ref value (the `current` property) during render can cause your component not to update as expected (https://react.dev/reference/react/useRef).
+
+C:\Users\cbdel\DischargeBuddy\src\components\emergency-flow.tsx:1683:55
+  1681 |             </TouchableOpacity>
+  1682 |             {/* Red YES tile ΓÇö flashing */}
+> 1683 |             <Animated.View style={{ flex: 1, opacity: frameFlash.interpolate({ inputRange: [0.15, 0.95], outputRange: [0.85, 1] }) }}>
+       |                                                       ^^^^^^^^^^ Passing a ref to a function may read its value during render
+  1684 |               <TouchableOpacity
+  1685 |                 style={styles.tileYes}
+  1686 |                 onPress={handleValidationYes}                                                                                                                                                                                                                                                                                                                    react-hooks/refs
+  1683:55   error    Error: Cannot access refs during render
+
+React refs are values that are not needed for rendering. Refs should only be accessed outside of render, such as in event handlers or effects. Accessing a ref value (the `current` property) during render can cause your component not to update as expected (https://react.dev/reference/react/useRef).
+
+C:\Users\cbdel\DischargeBuddy\src\components\emergency-flow.tsx:1683:55
+  1681 |             </TouchableOpacity>
+  1682 |             {/* Red YES tile ΓÇö flashing */}
+> 1683 |             <Animated.View style={{ flex: 1, opacity: frameFlash.interpolate({ inputRange: [0.15, 0.95], outputRange: [0.85, 1] }) }}>
+       |                                                       ^^^^^^^^^^^^^^^^^^^^^^ Passing a ref to a function may read its value during render
+  1684 |               <TouchableOpacity
+  1685 |                 style={styles.tileYes}
+  1686 |                 onPress={handleValidationYes}                                                                                                                                                                                                                                                                                                        react-hooks/refs
+  1693:95   error    `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      react/no-unescaped-entities
+  1693:109  error    `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      react/no-unescaped-entities
+  1698:52   error    Error: Cannot access refs during render
+
+React refs are values that are not needed for rendering. Refs should only be accessed outside of render, such as in event handlers or effects. Accessing a ref value (the `current` property) during render can cause your component not to update as expected (https://react.dev/reference/react/useRef).
+
+C:\Users\cbdel\DischargeBuddy\src\components\emergency-flow.tsx:1698:52
+  1696 |           </View>
+  1697 |         </View>
+> 1698 |         <Animated.View pointerEvents="none" style={[styles.emergencyFrame, styles.redFrame, { opacity: frameFlash }]} />
+       |                                                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Cannot access ref value during render
+  1699 |       </SafeAreaView>
+  1700 |     );
+  1701 |   }                                                                                                                                                                                                                                                                                                                                                                                                                                   react-hooks/refs
+  1698:93   error    Error: Cannot access refs during render
+
+React refs are values that are not needed for rendering. Refs should only be accessed outside of render, such as in event handlers or effects. Accessing a ref value (the `current` property) during render can cause your component not to update as expected (https://react.dev/reference/react/useRef).
+
+C:\Users\cbdel\DischargeBuddy\src\components\emergency-flow.tsx:1698:93
+  1696 |           </View>
+  1697 |         </View>
+> 1698 |         <Animated.View pointerEvents="none" style={[styles.emergencyFrame, styles.redFrame, { opacity: frameFlash }]} />
+       |                                                                                             ^^^^^^^^^^^^^^^^^^^^^^^ Cannot access ref value during render
+  1699 |       </SafeAreaView>
+  1700 |     );
+  1701 |   }                                                                                                                                                                                                                                                                                                                                                                                                                                    react-hooks/refs
+  1698:104  error    Error: Cannot access refs during render
+
+React refs are values that are not needed for rendering. Refs should only be accessed outside of render, such as in event handlers or effects. Accessing a ref value (the `current` property) during render can cause your component not to update as expected (https://react.dev/reference/react/useRef).
+
+C:\Users\cbdel\DischargeBuddy\src\components\emergency-flow.tsx:1698:104
+  1696 |           </View>
+  1697 |         </View>
+> 1698 |         <Animated.View pointerEvents="none" style={[styles.emergencyFrame, styles.redFrame, { opacity: frameFlash }]} />
+       |                                                                                                        ^^^^^^^^^^ Cannot access ref value during render
+  1699 |       </SafeAreaView>
+  1700 |     );
+  1701 |   }                                                                                                                                                                                                                                                                                                                                                                                                                                     react-hooks/refs
+  1759:88   error    `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      react/no-unescaped-entities
+  1813:19   error    `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      react/no-unescaped-entities
+  1813:39   error    `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      react/no-unescaped-entities
+  1813:44   error    `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      react/no-unescaped-entities
+  1813:49   error    `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      react/no-unescaped-entities
+  1813:77   error    `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      react/no-unescaped-entities
+  1813:90   error    `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      react/no-unescaped-entities
+  2006:23   error    `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      react/no-unescaped-entities
+  2006:36   error    `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      react/no-unescaped-entities
+  2035:16   error    Error: Cannot access refs during render
+
+React refs are values that are not needed for rendering. Refs should only be accessed outside of render, such as in event handlers or effects. Accessing a ref value (the `current` property) during render can cause your component not to update as expected (https://react.dev/reference/react/useRef).
+
+C:\Users\cbdel\DischargeBuddy\src\components\emergency-flow.tsx:2035:16
+  2033 |       <Animated.View
+  2034 |         pointerEvents="none"
+> 2035 |         style={[
+       |                ^
+> 2036 |           styles.emergencyFrame,
+       | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 2037 |           phase === 'countdown' && countdown <= 3 ? styles.redFrame : styles.amberFrame,
+       | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 2038 |           { opacity: frameFlash },
+       | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 2039 |         ]}
+       | ^^^^^^^^^^ Cannot access ref value during render
+  2040 |       />
+  2041 |     </SafeAreaView>
+  2042 |   );                                                                                                                                                                                                                                                                react-hooks/refs
+  2038:11   error    Error: Cannot access refs during render
+
+React refs are values that are not needed for rendering. Refs should only be accessed outside of render, such as in event handlers or effects. Accessing a ref value (the `current` property) during render can cause your component not to update as expected (https://react.dev/reference/react/useRef).
+
+C:\Users\cbdel\DischargeBuddy\src\components\emergency-flow.tsx:2038:11
+  2036 |           styles.emergencyFrame,
+  2037 |           phase === 'countdown' && countdown <= 3 ? styles.redFrame : styles.amberFrame,
+> 2038 |           { opacity: frameFlash },
+       |           ^^^^^^^^^^^^^^^^^^^^^^^ Cannot access ref value during render
+  2039 |         ]}
+  2040 |       />
+  2041 |     </SafeAreaView>                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             react-hooks/refs
+  2038:22   error    Error: Cannot access refs during render
+
+React refs are values that are not needed for rendering. Refs should only be accessed outside of render, such as in event handlers or effects. Accessing a ref value (the `current` property) during render can cause your component not to update as expected (https://react.dev/reference/react/useRef).
+
+C:\Users\cbdel\DischargeBuddy\src\components\emergency-flow.tsx:2038:22
+  2036 |           styles.emergencyFrame,
+  2037 |           phase === 'countdown' && countdown <= 3 ? styles.redFrame : styles.amberFrame,
+> 2038 |           { opacity: frameFlash },
+       |                      ^^^^^^^^^^ Cannot access ref value during render
+  2039 |         ]}
+  2040 |       />
+  2041 |     </SafeAreaView>                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               react-hooks/refs
+
+C:\Users\cbdel\DischargeBuddy\src\components\medication-flow.tsx
+  557:34  error  `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`  react/no-unescaped-entities
+  557:38  error  `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`  react/no-unescaped-entities
+
+C:\Users\cbdel\DischargeBuddy\src\hooks\use-color-scheme.web.ts
+  11:5  error  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+C:\Users\cbdel\DischargeBuddy\src\hooks\use-color-scheme.web.ts:11:5
+   9 |
+  10 |   useEffect(() => {
+> 11 |     setHasHydrated(true);
+     |     ^^^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  12 |   }, []);
+  13 |
+  14 |   const colorScheme = useRNColorScheme();  react-hooks/set-state-in-effect
+
+Γ£û 80 problems (72 errors, 8 warnings)
+  0 errors and 5 warnings potentially fixable with the `--fix` option.
+

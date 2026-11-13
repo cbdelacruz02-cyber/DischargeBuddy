@@ -73,6 +73,7 @@ type Phase =
   | 'validation'
   | 'alone-check'
   | 'pain'
+  | 'pain-escalation'   // ST-6: 5-second silent clear-the-air countdown after red 8–10 selection
   | 'countdown'
   | 'yellow'
   | 'lang-detect'
@@ -179,7 +180,7 @@ function containsLangFallback(input: string): boolean {
 const SILENCE_PHASE_MAP: Partial<Record<Phase, { target: Phase; seconds: number }>> = {
   'word-check':    { target: 'active-check', seconds: 5  },
   'active-check':  { target: 'validation',   seconds: 10 },
-  'pain':          { target: 'countdown',    seconds: 10 },
+  // 'pain' intentionally removed — no auto-escalation timer on pain evaluation screen (Fix 3)
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -224,11 +225,13 @@ export function EmergencyFlow({
 
   // ── Core phase state ───────────────────────────────────────────────────────
   const [phase, setPhase]               = useState<Phase>('pause');
-  const [pauseSeconds, setPauseSeconds] = useState(2);
+  const [pauseSeconds, setPauseSeconds] = useState(0);  // ST-6: start at 0 to skip initial pause
   const [nextPhase, setNextPhase]       = useState<Phase | null>(null);
   const [interSeconds, setInterSeconds] = useState(2);
 
   // ── Countdown / silence ────────────────────────────────────────────────────
+  // painEscalationCountdown: the 5-second "clear the air" countdown for pain-escalation phase
+  const [painEscalationCountdown, setPainEscalationCountdown] = useState(5);
   const [countdown, setCountdown]         = useState(5);
   const [silenceLeft, setSilenceLeft]     = useState(10);
   const [silenceActive, setSilenceActive] = useState(false);
@@ -300,11 +303,21 @@ export function EmergencyFlow({
       if (!lower) return;
       emgStopListening();
       const curPhase = phaseRef.current;
+
+      // ST-6: during pain-escalation, detect cancel words to abort
+      if (curPhase === 'pain-escalation') {
+        if (/\b(cancel|stop|no|help|ambulance)\b/.test(lower)) {
+          // Cancel: return to pain screen
+          transitionTo('pain');
+        }
+        return;
+      }
+
       if (curPhase === 'alone-check') {
-        const isYes = /\b(yes|sí|si|はい|oui)\b/.test(lower);
-        const isNo  = /\b(no|no|いいえ|non)\b/.test(lower);
-        if (isYes) { aloneHandlerRef.current?.(true);  return; }
-        if (isNo)  { aloneHandlerRef.current?.(false); return; }
+        const isYes = /\b(yes|sí|si|はい|oui|with someone|together)\b/.test(lower);
+        const isNo  = /\b(alone|by myself|no|nobody|いいえ|solo|live alone)\b/.test(lower);
+        if (isYes) { aloneHandlerRef.current?.(false); return; }  // "with someone" = not alone
+        if (isNo)  { aloneHandlerRef.current?.(true);  return; }  // "live alone" = alone
       }
       if (curPhase === 'word-check' || curPhase === 'active-check' || curPhase === 'validation') {
         wordScanHandlerRef.current?.(lower);
@@ -312,10 +325,16 @@ export function EmergencyFlow({
     },
   });
 
-  // Stop mic when leaving phases that need it
+  // Auto-start mic on phases that require it; stop mic on phases that do not
   useEffect(() => {
-    const micPhases: Phase[] = ['alone-check', 'word-check', 'active-check', 'validation'];
-    if (!micPhases.includes(phase)) {
+    const micPhases: Phase[] = ['alone-check', 'word-check', 'active-check', 'validation', 'pain-escalation'];
+    if (micPhases.includes(phase)) {
+      if (emgMicSupported) {
+        // Auto-start mic 1.5 s after phase TTS begins — give TTS a head start
+        const t = setTimeout(() => emgStartListening(), 1500);
+        return () => clearTimeout(t);
+      }
+    } else {
       emgStopListening();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -560,6 +579,12 @@ export function EmergencyFlow({
       }, 10000);
     }
 
+    // ST-6 — pain-escalation: speak "Help coming." then silent 5-second countdown begins
+    if (phase === 'pain-escalation') {
+      // Speak "Help coming." — NO other TTS during the 5-second window
+      speak(copy.helpIsOnTheWay, true);
+    }
+
     // Milestone E — countdown
     if (phase === 'countdown') {
       speak(
@@ -668,6 +693,15 @@ export function EmergencyFlow({
       return () => { clearInterval(iv); Vibration.cancel(); };
     }
 
+    // pain-escalation: heavy every-second vibrate (ST-6 clear-the-air)
+    if (phase === 'pain-escalation') {
+      const iv = setInterval(() => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+        Vibration.vibrate([0, 300, 200]);
+      }, 1000);
+      return () => { clearInterval(iv); Vibration.cancel(); };
+    }
+
     // Alone-check + pain: fast sharp shakes (Milestone D.4)
     if (phase === 'alone-check' || phase === 'pain') {
       const sharp = () => {
@@ -729,7 +763,7 @@ export function EmergencyFlow({
   useEffect(() => {
     const alarmPhases: Phase[] = [
       'pause', 'word-check', 'active-check', 'validation',
-      'alone-check', 'pain', 'countdown',
+      'alone-check', 'pain', 'pain-escalation', 'countdown',
     ];
     if (!alarmPhases.includes(phase)) {
       frameFlash.setValue(0);
@@ -867,6 +901,31 @@ export function EmergencyFlow({
   }, [countdown, phase]);
 
   // ─────────────────────────────────────────────────────────────────────────
+  // ST-6 — pain-escalation countdown (5 s silent, then Living Situation Q)
+  // ─────────────────────────────────────────────────────────────────────────
+  useEffect(() => {
+    if (phase !== 'pain-escalation') return;
+    if (painEscalationCountdown <= 0) {
+      // Silent 5 seconds over — now speak the Living Situation Question
+      speak(copy.livingQuestion, true);
+      // Transition to alone-check where the new buttons live
+      setTimeout(() => transitionTo('alone-check'), 800);
+      return;
+    }
+    const t = setTimeout(() => setPainEscalationCountdown(v => v - 1), 1000);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase, painEscalationCountdown]);
+
+  // Reset pain-escalation countdown when entering the phase
+  useEffect(() => {
+    if (phase === 'pain-escalation') {
+      setPainEscalationCountdown(5);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase]);
+
+  // ─────────────────────────────────────────────────────────────────────────
   // Handlers
   // ─────────────────────────────────────────────────────────────────────────
 
@@ -979,28 +1038,36 @@ export function EmergencyFlow({
   const handleWordScanForRef = useCallback((input: string) => handleWordScan(input), [handleWordScan]);
   useEffect(() => { wordScanHandlerRef.current = handleWordScanForRef; }, [handleWordScanForRef]);
 
-  /** Milestone D.5 — pain score selection (instant one-tap routing, no extra submit) */
-  const handlePainScore = useCallback((score: number) => {
-    setPainScore(score);
+  /** ST-6 — three color-coded pain tier buttons */
+  const handlePainTier = useCallback((tier: 'green' | 'yellow' | 'red') => {
     setSilenceActive(false);
     Haptics.selectionAsync();
-    if (score >= 8) {
-      // Red Tier → 2-second environmental pause → Double-Tile Safety Gate → calm 5s countdown
-      setCountdown(5);
-      speak(`Pain level ${score}. Red tier. Ambulance dispatch starting now.`, true);
-      setTimeout(() => transitionTo('countdown'), 1500);
-    } else if (score >= 4) {
-      // Yellow Tier → blue screen, globe, triple-tone chime, wave vibration
-      speak(`Pain level ${score}. Moderate. Connecting you to your clinic nurse.`, true);
+    if (tier === 'red') {
+      // Red 8–10: multi-sensory burst, speak "Help coming.", then silent 5-second countdown
+      setPainScore(8);
+      multiSensoryBurst();
+      // Immediately transition to pain-escalation phase (resets countdown to 5 internally)
+      transitionTo('pain-escalation');
+    } else if (tier === 'yellow') {
+      setPainScore(4);
+      speak('Moderate pain. Connecting you to your clinic nurse.', true);
       setTimeout(() => transitionTo('yellow'), 1500);
     } else {
-      // Green Tier (1–3) → local discharge files, sharp double-tap haptic
+      // Green 1–3
+      setPainScore(1);
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
       setTimeout(() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy), 140);
-      speak(`Pain level ${score}. Mild. Opening your care and recovery information.`, true);
+      speak('Mild pain. Opening your care and recovery information.', true);
       setTimeout(() => transitionTo('green'), 1500);
     }
-  }, [speak, transitionTo]);
+  }, [speak, transitionTo, multiSensoryBurst]);
+
+  /** Milestone D.5 — legacy numeric score (used by word-check fast-path if needed) */
+  const handlePainScore = useCallback((score: number) => {
+    if (score >= 8) handlePainTier('red');
+    else if (score >= 4) handlePainTier('yellow');
+    else handlePainTier('green');
+  }, [handlePainTier]);
 
   /** Milestone 2C — appointment routing YES */
   const handleAppointmentYes = useCallback(() => {
@@ -1412,7 +1479,8 @@ export function EmergencyFlow({
               Proceed with making an appointment?
             </Text>
             <View style={styles.twoButtonRow}>
-              <TouchableOpacity style={styles.noButton} onPress={() => transitionTo('green')} accessibilityRole="button" accessibilityLabel="No — view care information">
+              {/* No — stay in Yellow Tier nurse follow-up view (do NOT route to Green/Education) */}
+              <TouchableOpacity style={styles.noButton} onPress={() => { speak('Staying on your nurse care pathway.', true); }} accessibilityRole="button" accessibilityLabel="No — stay in nurse follow-up view">
                 <Text style={[styles.actionText, { fontSize: 17 * textScale }]}>No</Text>
               </TouchableOpacity>
               <TouchableOpacity
@@ -1441,8 +1509,9 @@ export function EmergencyFlow({
             <TouchableOpacity style={styles.greenTierBtn} onPress={handleGreenTier} accessibilityRole="button" accessibilityLabel={copy.greenTierTitle ?? 'View care information'}>
               <Text style={[styles.actionText, { fontSize: 15 * textScale }]}>{copy.greenTierTitle ?? '📋 Care Information'}</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.exitButton} onPress={onClose} accessibilityRole="button" accessibilityLabel={copy.returnHome ?? 'Return home'}>
-              <Text style={[styles.actionText, { fontSize: 15 * textScale }]}>{copy.returnHome ?? 'Return Home'}</Text>
+            {/* Return to Dashboard button */}
+            <TouchableOpacity style={styles.exitButton} onPress={onClose} accessibilityRole="button" accessibilityLabel="Return to Dashboard">
+              <Text style={[styles.actionText, { fontSize: 15 * textScale }]}>← Return to Dashboard</Text>
             </TouchableOpacity>
           </View>
         ) : (
@@ -1450,8 +1519,9 @@ export function EmergencyFlow({
             <Text style={[styles.yellowNurseLine, { fontSize: 16 * textScale }]}>
               ✅ Clinic is being called. Please stay on the line.
             </Text>
-            <TouchableOpacity style={styles.exitButton} onPress={onClose} accessibilityRole="button" accessibilityLabel={copy.returnHome ?? 'Return home'}>
-              <Text style={[styles.actionText, { fontSize: 15 * textScale }]}>{copy.returnHome ?? 'Return Home'}</Text>
+            {/* Return to Dashboard button */}
+            <TouchableOpacity style={styles.exitButton} onPress={onClose} accessibilityRole="button" accessibilityLabel="Return to Dashboard">
+              <Text style={[styles.actionText, { fontSize: 15 * textScale }]}>← Return to Dashboard</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -1745,122 +1815,97 @@ export function EmergencyFlow({
           </View>
         )}
 
-        {/* ── ALONE-CHECK — Milestone D.6 ── */}
+        {/* ── ALONE-CHECK — ST-6: Living Situation Question ── */}
         {phase === 'alone-check' && (
           <View style={styles.aloneCheckBox}>
             <Text style={[styles.sectionTitle, { fontSize: 22 * textScale }]}>
-              {copy.areYouAlone ?? 'Are you completely alone right now?'}
+              {copy.livingQuestion ?? copy.areYouAlone ?? 'Are you with someone or do you live alone?'}
             </Text>
-            <Text style={[styles.sectionBody, { fontSize: 15 * textScale }]}>
-              This will be permanently saved with your medical dispatch record to inform paramedics.
-            </Text>
-            {/* 🎤 Mic button for voice yes/no */}
+            {/* Mic listening badge — auto-started 1.5 s after TTS */}
             {emgMicSupported && (
               <TouchableOpacity
                 style={[styles.micBtnEmg, emgIsListening && styles.micBtnEmgActive]}
                 onPress={() => emgIsListening ? emgStopListening() : emgStartListening()}
                 accessibilityRole="button"
-                accessibilityLabel={emgIsListening ? 'Stop microphone' : 'Tap mic and say Yes or No'}
+                accessibilityLabel={emgIsListening ? 'Stop microphone' : 'Tap mic to answer by voice'}
               >
                 <Text style={{ fontSize: 24 }}>🎤</Text>
                 <Text style={[styles.actionText, { fontSize: 13 * textScale }]}>
                   {emgIsListening
                     ? (copy.listeningIndicator ?? '🎤 Listening…')
-                    : (copy.tapToConfirm ?? 'Tap 🎤 to answer by voice')}
+                    : 'Tap to speak'}
                 </Text>
               </TouchableOpacity>
             )}
             <View style={styles.twoButtonRow}>
-              <TouchableOpacity style={styles.aloneNoBtn} onPress={() => handleAloneAnswer(false)} accessibilityRole="button" accessibilityLabel="No — someone is nearby">
-                <Text style={[styles.actionText, { fontSize: 18 * textScale }]}>No — Someone{'\n'}Is Nearby</Text>
+              {/* Green — Yes, with someone */}
+              <TouchableOpacity style={styles.aloneNoBtn} onPress={() => handleAloneAnswer(false)} accessibilityRole="button" accessibilityLabel="Yes, with someone">
+                <Text style={[styles.actionText, { fontSize: 16 * textScale }]}>{copy.livingWithSomeone ?? 'Yes, with someone'}</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.aloneYesBtn} onPress={() => handleAloneAnswer(true)} accessibilityRole="button" accessibilityLabel="Yes — I am completely alone">
-                <Text style={[styles.actionText, { fontSize: 18 * textScale }]}>Yes — I Am{'\n'}Alone</Text>
+              {/* Red — No, live alone */}
+              <TouchableOpacity style={styles.aloneYesBtn} onPress={() => handleAloneAnswer(true)} accessibilityRole="button" accessibilityLabel="No, live alone">
+                <Text style={[styles.actionText, { fontSize: 16 * textScale }]}>{copy.livingAlone ?? 'No, live alone'}</Text>
               </TouchableOpacity>
             </View>
+            {/* Cancel Help + Return to Main Page */}
+            <TouchableOpacity style={styles.exitButton} onPress={() => transitionTo('pain')} accessibilityRole="button" accessibilityLabel="Cancel Help">
+              <Text style={[styles.actionText, { fontSize: 15 * textScale }]}>{copy.cancelAmbulance ?? 'Cancel Help'}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.exitButton} onPress={onClose} accessibilityRole="button" accessibilityLabel="Return to Main Page">
+              <Text style={[styles.actionText, { fontSize: 15 * textScale }]}>{copy.returnToMainPage ?? 'Return to Main Page'}</Text>
+            </TouchableOpacity>
           </View>
         )}
 
-        {/* ── PAIN — Milestone D.4/5 (elderly-first redesign) ── */}
+        {/* ── PAIN — ST-6: three color-coded tier buttons ── */}
         {phase === 'pain' && (
           <View style={styles.painSection}>
             <Text style={[styles.sectionTitle, { fontSize: 22 * textScale }]}>
               How bad is your pain right now?
             </Text>
+            <Text style={[styles.sectionBody, { fontSize: 14 * textScale, textAlign: 'center', color: '#94a3b8' }]}>
+              {copy.painHint}
+            </Text>
 
-            {/* Tier badges — colour meaning inline, no separate legend to read */}
-            <View style={styles.painTierBadges}>
-              <View style={[styles.painTierBadge, styles.painTierBadgeGreen]}>
-                <Text style={[styles.painTierBadgeText, { fontSize: 12 * textScale, color: '#4ade80' }]}>● Mild  1–3</Text>
-              </View>
-              <View style={[styles.painTierBadge, styles.painTierBadgeAmber]}>
-                <Text style={[styles.painTierBadgeText, { fontSize: 12 * textScale, color: '#fbbf24' }]}>● Moderate  4–7</Text>
-              </View>
-              <View style={[styles.painTierBadge, styles.painTierBadgeRed]}>
-                <Text style={[styles.painTierBadgeText, { fontSize: 12 * textScale, color: '#ff453a' }]}>● Severe  8–10</Text>
-              </View>
+            {/* Three large color-coded tier buttons */}
+            <View style={styles.painTierBtnRow}>
+              {/* 🟢 Green: 1–3 Mild */}
+              <TouchableOpacity
+                style={[styles.painTierBtn, styles.painTierBtnGreen, painScore === 1 && styles.painTierBtnSelected]}
+                onPress={() => handlePainTier('green')}
+                accessibilityRole="button"
+                accessibilityLabel="Pain level 1 to 3. Mild. Tap to open care information."
+              >
+                <Text style={[styles.painTierBtnRange, { fontSize: 28 * textScale }]}>1 – 3</Text>
+                <Text style={[styles.painTierBtnLabel, { fontSize: 16 * textScale, color: '#4ade80' }]}>Mild</Text>
+              </TouchableOpacity>
+
+              {/* 🟡 Yellow: 4–7 Moderate */}
+              <TouchableOpacity
+                style={[styles.painTierBtn, styles.painTierBtnAmber, painScore === 4 && styles.painTierBtnSelected]}
+                onPress={() => handlePainTier('yellow')}
+                accessibilityRole="button"
+                accessibilityLabel="Pain level 4 to 7. Moderate. Tap to connect to nurse line."
+              >
+                <Text style={[styles.painTierBtnRange, { fontSize: 28 * textScale }]}>4 – 7</Text>
+                <Text style={[styles.painTierBtnLabel, { fontSize: 16 * textScale, color: '#fbbf24' }]}>Moderate</Text>
+              </TouchableOpacity>
+
+              {/* 🔴 Red: 8–10 Severe */}
+              <TouchableOpacity
+                style={[styles.painTierBtn, styles.painTierBtnRed, painScore === 8 && styles.painTierBtnSelected]}
+                onPress={() => handlePainTier('red')}
+                accessibilityRole="button"
+                accessibilityLabel="Pain level 8 to 10. Severe. Tap to send ambulance."
+              >
+                <Text style={[styles.painTierBtnRange, { fontSize: 28 * textScale }]}>8 – 10</Text>
+                <Text style={[styles.painTierBtnLabel, { fontSize: 16 * textScale, color: '#ff453a' }]}>Severe</Text>
+              </TouchableOpacity>
             </View>
 
-            {SilenceBar}
-
-            {/* Row 1: 1–5 */}
-            <View style={styles.painRow}>
-              {[1, 2, 3, 4, 5].map(score => (
-                <TouchableOpacity
-                  key={score}
-                  style={[
-                    styles.painButton,
-                    score <= 3 ? styles.painButtonGreen : styles.painButtonAmber,
-                    painScore === score && styles.painSelected,
-                  ]}
-                  onPress={() => handlePainScore(score)}
-                  accessibilityRole="button"
-                  accessibilityLabel={
-                    copy.painScore?.(score) ??
-                    `Pain level ${score}. ${score >= 8 ? 'Severe — ambulance.' : score >= 4 ? 'Moderate — nurse line.' : 'Mild — care information.'}`
-                  }
-                >
-                  <Text style={[styles.painButtonText, { fontSize: 22 * textScale }]}>{score}</Text>
-                  <Text style={[styles.painButtonSubLabel, { fontSize: 11 * textScale },
-                    score <= 3 ? { color: '#4ade80' } : { color: '#fbbf24' },
-                  ]}>
-                    {score <= 3 ? 'Mild' : 'Mod'}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-
-            {/* Row 2: 6–10 */}
-            <View style={styles.painRow}>
-              {[6, 7, 8, 9, 10].map(score => (
-                <TouchableOpacity
-                  key={score}
-                  style={[
-                    styles.painButton,
-                    score <= 7 ? styles.painButtonAmber : styles.painButtonRed,
-                    painScore === score && styles.painSelected,
-                  ]}
-                  onPress={() => handlePainScore(score)}
-                  accessibilityRole="button"
-                  accessibilityLabel={
-                    copy.painScore?.(score) ??
-                    `Pain level ${score}. ${score >= 8 ? 'Severe — ambulance.' : 'Moderate — nurse line.'}`
-                  }
-                >
-                  <Text style={[styles.painButtonText, { fontSize: 22 * textScale }]}>{score}</Text>
-                  <Text style={[styles.painButtonSubLabel, { fontSize: 11 * textScale },
-                    score <= 7 ? { color: '#fbbf24' } : { color: '#ff453a' },
-                  ]}>
-                    {score <= 7 ? 'Mod' : 'Severe'}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-
-            {/* Repeat prompt — promoted above "I Feel Fine" so it's thumb-reachable */}
             <TouchableOpacity
               style={styles.repeatButton}
-              onPress={() => speak(language.emergencyPrompt ?? 'Are you having an emergency?', true)}
+              onPress={() => speak('On a scale of 1 to 10, how bad is your pain? Green is mild, yellow is moderate, red is severe.', true)}
               accessibilityRole="button"
               accessibilityLabel={copy.repeatPrompt ?? 'Repeat voice prompt'}
             >
@@ -1871,6 +1916,53 @@ export function EmergencyFlow({
 
             <TouchableOpacity style={styles.greenTierBtn} onPress={handleGreenTier} accessibilityRole="button" accessibilityLabel="I feel fine — view care information">
               <Text style={[styles.actionText, { fontSize: 17 * textScale }]}>✅ I Feel Fine</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {/* ── PAIN-ESCALATION — ST-6: 5-second silent clear-the-air countdown ── */}
+        {phase === 'pain-escalation' && (
+          <View style={styles.countdownSection}>
+            <Text style={[styles.sectionTitle, { fontSize: 22 * textScale, color: '#ef4444' }]}>
+              🚨 {copy.helpIsOnTheWay}
+            </Text>
+            <Animated.View style={[
+              styles.countdownBox,
+              { transform: [{ scale: pulse }] },
+            ]}>
+              <Text style={[styles.countdownNumber, { fontSize: 80 * textScale, color: '#ef4444' }]}>
+                {painEscalationCountdown}
+              </Text>
+              <Text style={[styles.countdownLabel, { fontSize: 16 * textScale }]}>
+                {copy.clearTheAirInstruction}
+              </Text>
+            </Animated.View>
+
+            {/* Mic listening indicator */}
+            {emgMicSupported && (
+              <View style={[styles.micBtnEmg, emgIsListening && styles.micBtnEmgActive]}>
+                <Text style={{ fontSize: 22 }}>🎤</Text>
+                <Text style={[styles.actionText, { fontSize: 12 * textScale }]}>
+                  {emgIsListening ? copy.listeningIndicator ?? '🎤 Listening…' : 'Preparing mic…'}
+                </Text>
+              </View>
+            )}
+
+            {/* Cancel Help — returns to pain screen */}
+            <TouchableOpacity
+              style={styles.countdownCancelBtn}
+              onPress={() => transitionTo('pain')}
+              accessibilityRole="button"
+              accessibilityLabel={copy.cancelAmbulance ?? 'Cancel Help'}
+            >
+              <Text style={[styles.countdownCancelText, { fontSize: 18 * textScale }]}>
+                ✕  {copy.cancelAmbulance ?? 'Cancel Help'}
+              </Text>
+            </TouchableOpacity>
+
+            {/* Return to Main Page */}
+            <TouchableOpacity style={styles.exitButton} onPress={onClose} accessibilityRole="button" accessibilityLabel="Return to Main Page">
+              <Text style={[styles.actionText, { fontSize: 15 * textScale }]}>{copy.returnToMainPage ?? 'Return to Main Page'}</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -2063,6 +2155,16 @@ const styles = StyleSheet.create({
   painTierBadgeAmber:  { backgroundColor: '#431407' },
   painTierBadgeRed:    { backgroundColor: '#3b0000' },
   painTierBadgeText:   { fontWeight: '800', textAlign: 'center' },
+
+  // ── Pain Tier Buttons — ST-6: three large color-coded buttons ──
+  painTierBtnRow:      { flexDirection: 'row', gap: 10, width: '100%', marginVertical: 8 },
+  painTierBtn:         { flex: 1, minHeight: 90, borderRadius: 14, borderWidth: 2, alignItems: 'center', justifyContent: 'center', paddingVertical: 14, gap: 4 },
+  painTierBtnGreen:    { backgroundColor: '#052e16', borderColor: '#4ade80' },
+  painTierBtnAmber:    { backgroundColor: '#431407', borderColor: '#fbbf24' },
+  painTierBtnRed:      { backgroundColor: '#3b0000', borderColor: '#ff453a' },
+  painTierBtnSelected: { borderWidth: 4, opacity: 1 },
+  painTierBtnRange:    { color: '#ffffff', fontWeight: '900', textAlign: 'center' },
+  painTierBtnLabel:    { fontWeight: '800', textAlign: 'center' },
 
   // ── Countdown section ──
   countdownSection:      { gap: 14, alignItems: 'center' },

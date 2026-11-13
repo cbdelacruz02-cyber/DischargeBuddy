@@ -10,6 +10,7 @@ export type UiCopy = {
   dueAt: (time: string) => string;
   markTaken: string;
   taken: string;
+  takenDone: string;
   remindMe: string;
   reminderOn: string;
   nextAppointment: string;
@@ -85,7 +86,9 @@ export type UiCopy = {
   greenCardEmergency?: string;
   greenCardEmergencyBody?: string;
   // ── Voice trigger 4-step flow ───────────────────────────────────────────
-  /** Step 1: prompt asking user to say the trigger phrase ("Help", etc.) */
+  /** Instruction spoken immediately on tap — "Bring mouth closer" */
+  triggerInstruction: string;
+  /** Step 1: prompt shown on screen after instruction fires */
   voiceTriggerPrompt: (phrase: string) => string;
   /** Step 1: mic listening indicator */
   listeningIndicator: string;
@@ -93,25 +96,49 @@ export type UiCopy = {
   tapToConfirm: string;
   /** Step 2: countdown screen title */
   dispatchCountdownTitle: string;
-  /** Step 3: are-you-alone question (spoken + shown) */
+  /** Step 2: "clear the air" label shown during 5-second silent countdown */
+  clearTheAirInstruction: string;
+  /** Step 3: living situation question (spoken + shown) */
+  livingQuestion: string;
+  /** Step 3: green button — yes, with someone */
+  livingWithSomeone: string;
+  /** Step 3: red button — no, live alone */
+  livingAlone: string;
+  /** Step 3: legacy alone question key */
   areYouAlone: string;
-  /** Step 4: help is on the way message */
+  /** Step 4: help coming message — no "is" or "on its way" */
   helpIsOnTheWay: string;
+  /** Cancel button during voice trigger flow */
   cancelAmbulance: string;
-  // ── Name capture (multilingual) ─────────────────────────────────────────
-  /** Full prompt asking user to bring phone close and say name slowly */
+  /** Return to main page button */
+  returnToMainPage: string;
+  // ── Name capture / verification ─────────────────────────────────────────
   namePromptSpeak: string;
-  /** "I heard [name]" spoken confirmation */
   iHeard: (name: string) => string;
-  /** Re-play name button */
   replayName: string;
+  /** Auto-announce: "Your name is [name]. Is that correct?" */
+  nameIsCorrect: (name: string) => string;
+  editName: string;
+  spellFirstName: string;
+  spellLastName: string;
+  nameSpelledFirst: (name: string) => string;
+  nameSpelledLast: (name: string) => string;
+  // ── Speaker / Read-All controls ─────────────────────────────────────────
+  speakerOn: string;
+  speakerOff: string;
+  readAll: string;
+  stopReading: string;
 };
 
 const copies: Record<LanguageLabel, UiCopy> = {
   English: {
     homeTab: 'Home', exploreTab: 'Explore', welcomeBack: 'Welcome back', condition: 'Post-Cardiac Surgery Recovery',
     medications: "Today's Medications", medsComplete: (taken, total) => `${taken}/${total} meds complete today`,
-    dueAt: time => `Due at ${time}`, markTaken: 'Mark Taken', taken: 'Taken', remindMe: 'Remind Me', reminderOn: 'Reminder On',
+    dueAt: time => `Due at ${time}`,
+    markTaken: 'Taken',
+    taken: 'Taken',
+    takenDone: 'Taken ✓',
+    remindMe: 'Remind Me', reminderOn: 'Reminder On',
     nextAppointment: 'Next Appointment', doctor: 'Dr. Reyes — Cardiology', appointmentLocation: 'Heart Care Clinic, Room 204',
     cancelReminder: 'Cancel Reminder', moveOneDay: 'Move +1 Day', appointmentDateChanged: 'Demo appointment moved one day later. Set the reminder again.', offlineSample: 'OFFLINE DEMO · SAMPLE PATIENT DATA',
     help: 'HELP', helpSubtitle: 'Emergency alert demo · No call placed', moreTools: 'Language & Accessibility', hideTools: 'Hide Language & Accessibility',
@@ -131,7 +158,7 @@ const copies: Record<LanguageLabel, UiCopy> = {
     alertTitle: 'RED TIER · EMERGENCY DEMO', promptLanguage: language => `Prompt language: ${language}`,
     emergencyQuestion: 'Are you actively experiencing a medical emergency right now?', demoOnlyNotice: 'DEMO ONLY · No emergency service will be contacted.',
     repeatPrompt: 'Repeat Voice Prompt', secondsRemaining: seconds => `${seconds} seconds remaining`, painScale: 'Rate your pain or discomfort (1–10):',
-    painScore: score => `Pain score ${score}`, painHint: 'A score of 8 or higher enters emergency confirmation. A score of 7 or lower opens the Yellow-tier demo.',
+    painScore: score => `Pain score ${score}`, painHint: 'Green 1–3 is mild. Yellow 4–7 is moderate. Red 8–10 is severe.',
     yesAmbulance: 'YES · AMBULANCE', yesSimulate: 'YES · SIMULATE ESCALATION', noCancel: 'NO · CANCEL',
     cancelled: 'ALERT CANCELLED', returnHome: 'Return to Dashboard', yellowTier: 'YELLOW TIER · CARE PATHWAY DEMO',
     simulatedEscalation: 'DEMO ESCALATION SELECTED',
@@ -140,21 +167,41 @@ const copies: Record<LanguageLabel, UiCopy> = {
     safetyPause: seconds => `Safety pause. Pain evaluation begins in ${seconds} seconds.`,
     scoreThreshold: 'DEMO SCORE CHECK · 8+ RED · 1–7 YELLOW',
     noResponseDemo: 'No response selects the simulated Red outcome. No call will be placed.',
-    voiceTriggerPrompt: phrase => `Please say "${phrase}" out loud now. Tap 🎤 to activate the microphone.`,
-    listeningIndicator: '🎤 Listening… speak clearly',
+    triggerInstruction: 'Bring your mouth closer to the microphone and speak the text indicated in the box.',
+    voiceTriggerPrompt: phrase => `Say "${phrase}" now. The microphone is listening.`,
+    listeningIndicator: '🎤 Listening…',
     tapToConfirm: 'Tap to Confirm / Type',
-    dispatchCountdownTitle: '🚨 Demo Simulation',
-    areYouAlone: 'Are you alone?',
-    helpIsOnTheWay: 'Help is on the way. Ambulance is coming.',
-    cancelAmbulance: 'Cancel Ambulance',
+    dispatchCountdownTitle: '🚨 Listening — speak "Cancel" to stop',
+    clearTheAirInstruction: 'Microphone listening. Say "Cancel" to stop. Stay silent to continue.',
+    livingQuestion: 'Are you with someone or do you live alone? Say "with someone" or "live alone", or press a button.',
+    livingWithSomeone: 'Yes, with someone',
+    livingAlone: 'No, live alone',
+    areYouAlone: 'Are you with someone, or do you live alone?',
+    helpIsOnTheWay: 'Help coming.',
+    cancelAmbulance: 'Cancel Help',
+    returnToMainPage: 'Return to Main Page',
     namePromptSpeak: 'Please bring the phone close to your mouth and speak your name slowly.',
     iHeard: name => `I heard: ${name}`,
     replayName: '🔊 Replay Name',
+    nameIsCorrect: name => `Your name is ${name}. Is that correct?`,
+    editName: '✏ Edit Name',
+    spellFirstName: 'Please spell your first name slowly, one letter at a time.',
+    spellLastName: 'Now please spell your last name, one letter at a time.',
+    nameSpelledFirst: name => `Your first name is ${name}. Is that correct?`,
+    nameSpelledLast: name => `Your last name is ${name}. Is that correct?`,
+    speakerOn: 'Speaker is activated',
+    speakerOff: 'Speaker off',
+    readAll: '📢 Read All',
+    stopReading: '■ Stop Reading',
   },
   Español: {
     homeTab: 'Inicio', exploreTab: 'Guía', welcomeBack: 'Bienvenida', condition: 'Recuperación después de cirugía cardíaca',
     medications: 'Medicamentos de hoy', medsComplete: (taken, total) => `${taken} de ${total} medicamentos completados hoy`,
-    dueAt: time => `A las ${time}`, markTaken: 'Marcar tomado', taken: 'Tomado', remindMe: 'Recordarme', reminderOn: 'Aviso activo',
+    dueAt: time => `A las ${time}`,
+    markTaken: 'Tomado',
+    taken: 'Tomado',
+    takenDone: 'Tomado ✓',
+    remindMe: 'Recordarme', reminderOn: 'Aviso activo',
     nextAppointment: 'Próxima cita', doctor: 'Dr. Reyes — Cardiología', appointmentLocation: 'Clínica Cardíaca, consultorio 204',
     cancelReminder: 'Cancelar aviso', moveOneDay: 'Mover +1 día', appointmentDateChanged: 'La cita de demostración se movió un día. Configure el recordatorio otra vez.', offlineSample: 'DEMOSTRACIÓN SIN CONEXIÓN · DATOS DE EJEMPLO',
     help: 'AYUDA', helpSubtitle: 'Demostración de alerta · No se realiza ninguna llamada', moreTools: 'Idioma y accesibilidad', hideTools: 'Ocultar idioma y accesibilidad',
@@ -174,7 +221,7 @@ const copies: Record<LanguageLabel, UiCopy> = {
     alertTitle: 'NIVEL ROJO · DEMOSTRACIÓN', promptLanguage: language => `Idioma del aviso: ${language}`,
     emergencyQuestion: '¿Está experimentando una emergencia médica ahora?', demoOnlyNotice: 'SOLO DEMOSTRACIÓN · No se contactará a emergencias.',
     repeatPrompt: 'Repetir aviso de voz', secondsRemaining: seconds => `${seconds} segundos restantes`, painScale: 'Califique el dolor o malestar (1–10):',
-    painScore: score => `Nivel de dolor ${score}`, painHint: 'Un nivel de 8 o más abre la confirmación de emergencia. Un nivel de 7 o menos abre la demostración amarilla.',
+    painScore: score => `Nivel de dolor ${score}`, painHint: 'Verde 1–3 leve. Amarillo 4–7 moderado. Rojo 8–10 severo.',
     yesAmbulance: 'SÍ · AMBULANCIA', yesSimulate: 'SÍ · SIMULAR ESCALACIÓN', noCancel: 'NO · CANCELAR',
     cancelled: 'ALERTA CANCELADA', returnHome: 'Volver al inicio', yellowTier: 'NIVEL AMARILLO · DEMOSTRACIÓN',
     simulatedEscalation: 'ESCALACIÓN DE DEMOSTRACIÓN',
@@ -183,21 +230,41 @@ const copies: Record<LanguageLabel, UiCopy> = {
     safetyPause: seconds => `Pausa de seguridad. La evaluación del dolor comienza en ${seconds} segundos.`,
     scoreThreshold: 'EVALUACIÓN DE DEMOSTRACIÓN · 8+ ROJO · 1–7 AMARILLO',
     noResponseDemo: 'Si no hay respuesta, se selecciona el resultado rojo simulado. No se realizará ninguna llamada.',
-    voiceTriggerPrompt: phrase => `Por favor diga "${phrase}" en voz alta ahora. Toque 🎤 para activar el micrófono.`,
-    listeningIndicator: '🎤 Escuchando… hable con claridad',
+    triggerInstruction: 'Acerque la boca al micrófono y diga el texto indicado en el recuadro.',
+    voiceTriggerPrompt: phrase => `Diga "${phrase}" ahora. El micrófono está escuchando.`,
+    listeningIndicator: '🎤 Escuchando…',
     tapToConfirm: 'Toque para confirmar / escribir',
-    dispatchCountdownTitle: '🚨 Simulación de demostración',
-    areYouAlone: '¿Está solo o sola?',
-    helpIsOnTheWay: 'La ayuda está en camino. La ambulancia viene.',
-    cancelAmbulance: 'Cancelar ambulancia',
+    dispatchCountdownTitle: '🚨 Escuchando — diga "Cancelar" para detener',
+    clearTheAirInstruction: 'Micrófono escuchando. Diga "Cancelar" para detener. Guarde silencio para continuar.',
+    livingQuestion: '¿Está con alguien o vive solo? Diga "con alguien" o "vivo solo", o presione un botón.',
+    livingWithSomeone: 'Sí, con alguien',
+    livingAlone: 'No, vivo solo',
+    areYouAlone: '¿Está con alguien o vive solo?',
+    helpIsOnTheWay: 'Ayuda en camino.',
+    cancelAmbulance: 'Cancelar ayuda',
+    returnToMainPage: 'Volver a la página principal',
     namePromptSpeak: 'Acerque el teléfono a su boca y diga su nombre despacio.',
     iHeard: name => `Escuché: ${name}`,
     replayName: '🔊 Repetir nombre',
+    nameIsCorrect: name => `Su nombre es ${name}. ¿Es correcto?`,
+    editName: '✏ Editar nombre',
+    spellFirstName: 'Por favor deletree su nombre de pila, una letra a la vez.',
+    spellLastName: 'Ahora por favor deletree su apellido, una letra a la vez.',
+    nameSpelledFirst: name => `Su nombre de pila es ${name}. ¿Es correcto?`,
+    nameSpelledLast: name => `Su apellido es ${name}. ¿Es correcto?`,
+    speakerOn: 'Altavoz activado',
+    speakerOff: 'Altavoz apagado',
+    readAll: '📢 Leer todo',
+    stopReading: '■ Detener lectura',
   },
   日本語: {
     homeTab: 'ホーム', exploreTab: 'ガイド', welcomeBack: 'おかえりなさい', condition: '心臓手術後の回復',
     medications: '今日の薬', medsComplete: (taken, total) => `今日の服薬 ${total} 件中 ${taken} 件完了`,
-    dueAt: time => `${time} に服用`, markTaken: '服用済みにする', taken: '服用済み', remindMe: '通知を設定', reminderOn: '通知設定済み',
+    dueAt: time => `${time} に服用`,
+    markTaken: '服用する',
+    taken: '服用する',
+    takenDone: '服用済み ✓',
+    remindMe: '通知を設定', reminderOn: '通知設定済み',
     nextAppointment: '次回の診察', doctor: 'レイエス医師 — 循環器科', appointmentLocation: 'ハートケア診療所 204号室',
     cancelReminder: '通知を取消', moveOneDay: '1日後に変更', appointmentDateChanged: 'デモの診察日を1日後に変更しました。リマインダーを再設定してください。', offlineSample: 'オフラインデモ · サンプル患者データ',
     help: 'ヘルプ', helpSubtitle: '緊急アラートのデモ · 電話はかけません', moreTools: '言語とアクセシビリティ', hideTools: '言語とアクセシビリティを閉じる',
@@ -217,7 +284,7 @@ const copies: Record<LanguageLabel, UiCopy> = {
     alertTitle: 'レッド段階 · 緊急デモ', promptLanguage: language => `案内言語: ${language}`,
     emergencyQuestion: '現在、医療上の緊急事態ですか？', demoOnlyNotice: 'デモのみ · 救急サービスには連絡しません。',
     repeatPrompt: '音声案内を繰り返す', secondsRemaining: seconds => `残り${seconds}秒`, painScale: '痛みや不快感を1〜10で評価してください:',
-    painScore: score => `痛みのレベル ${score}`, painHint: '8以上は緊急確認へ進みます。7以下はイエロー段階のデモへ進みます。',
+    painScore: score => `痛みのレベル ${score}`, painHint: '緑1〜3は軽度。黄4〜7は中度。赤8〜10は重度。',
     yesAmbulance: 'はい · 救急車', yesSimulate: 'はい · 対応をシミュレーション', noCancel: 'いいえ · キャンセル',
     cancelled: 'アラートをキャンセルしました', returnHome: 'ホームに戻る', yellowTier: 'イエロー段階 · ケア経路デモ',
     simulatedEscalation: '緊急対応のデモを選択しました',
@@ -226,16 +293,32 @@ const copies: Record<LanguageLabel, UiCopy> = {
     safetyPause: seconds => `安全確認のため一時停止します。${seconds}秒後に痛みを評価します。`,
     scoreThreshold: 'デモ判定 · 8以上はレッド · 1〜7はイエロー',
     noResponseDemo: '応答がない場合はレッド段階のデモ結果になります。電話はかけません。',
-    voiceTriggerPrompt: phrase => `「${phrase}」と声に出して言ってください。🎤 をタップしてマイクを起動します。`,
-    listeningIndicator: '🎤 聞き取り中… はっきりお話しください',
+    triggerInstruction: 'マイクに口を近づけて、ボックスに表示されている言葉を話してください。',
+    voiceTriggerPrompt: phrase => `「${phrase}」と今すぐ言ってください。マイクが聞いています。`,
+    listeningIndicator: '🎤 聞き取り中…',
     tapToConfirm: 'タップして確認 / 入力',
-    dispatchCountdownTitle: '🚨 デモシミュレーション',
-    areYouAlone: '一人ですか？',
-    helpIsOnTheWay: '助けが向かっています。救急車が来ます。',
-    cancelAmbulance: '救急車をキャンセル',
+    dispatchCountdownTitle: '🚨 聞き取り中 — 「キャンセル」と言って停止',
+    clearTheAirInstruction: 'マイクが聞いています。停止するには「キャンセル」と言ってください。続ける場合は沈黙してください。',
+    livingQuestion: '誰かと一緒にいますか、それとも一人ですか？「一緒にいる」か「一人」と言うか、ボタンを押してください。',
+    livingWithSomeone: 'はい、一緒にいる',
+    livingAlone: 'いいえ、一人',
+    areYouAlone: '誰かと一緒にいますか、それとも一人ですか？',
+    helpIsOnTheWay: '助けが向かっています。',
+    cancelAmbulance: '助けをキャンセル',
+    returnToMainPage: 'メインページに戻る',
     namePromptSpeak: '携帯電話を口元に近づけて、お名前をゆっくりお話しください。',
     iHeard: name => `聞こえました: ${name}`,
     replayName: '🔊 名前を再生',
+    nameIsCorrect: name => `お名前は${name}ですね。正しいですか？`,
+    editName: '✏ 名前を編集',
+    spellFirstName: 'お名前を一文字ずつゆっくりスペルしてください。',
+    spellLastName: '次に苗字を一文字ずつスペルしてください。',
+    nameSpelledFirst: name => `お名前は${name}ですね。正しいですか？`,
+    nameSpelledLast: name => `苗字は${name}ですね。正しいですか？`,
+    speakerOn: 'スピーカーが有効です',
+    speakerOff: 'スピーカーオフ',
+    readAll: '📢 すべて読む',
+    stopReading: '■ 読み上げ停止',
   },
 };
 

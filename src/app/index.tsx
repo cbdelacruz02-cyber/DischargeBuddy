@@ -9,8 +9,8 @@ import {
   Platform,
   ScrollView,
   StyleSheet,
+  Switch,
   Text,
-  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
@@ -21,7 +21,12 @@ import type { LanguageLabel } from '@/constants/safety-content';
 import { getUiCopy } from '@/constants/ui-copy';
 import { useAppLanguage } from '@/contexts/language-context';
 import { EmergencyFlow } from '@/components/emergency-flow';
+import { MicTextInput } from '@/components/MicTextInput';
 import { useVoiceRecognition } from '@/hooks/use-voice-recognition';
+
+// ─── Accessible speech rate cap ───────────────────────────────────────────────
+// Slightly below the previous 0.65 — lower pitch/rate aids elderly + hearing-impaired
+const ACCESSIBLE_RATE = 0.6;
 
 // ─── Patient demo data ────────────────────────────────────────────────────────
 const PATIENT_DEFAULT_NAME = 'Maria Johnson';
@@ -45,25 +50,28 @@ type Medication = {
   hour: number;
   minute: number;
   taken: boolean;
+  /** locked = missed & 6-alert lockout expired; grayed but NOT shown as taken ✓ */
+  locked?: boolean;
   interval: 'Morning' | 'Afternoon' | 'Evening';
   intervalEmoji: string;
   intervalColor: string;
 };
 
 const initialMedications: Medication[] = [
-  { name: 'Metoprolol 25mg',  time: '8:00 AM',  hour: 8,  minute: 0, taken: false, interval: 'Morning',   intervalEmoji: '🌅', intervalColor: '#fbbf24' },
-  { name: 'Lisinopril 10mg',  time: '12:00 PM', hour: 12, minute: 0, taken: false, interval: 'Afternoon', intervalEmoji: '☀️', intervalColor: '#f97316' },
-  { name: 'Aspirin 81mg',     time: '8:00 PM',  hour: 20, minute: 0, taken: false, interval: 'Evening',   intervalEmoji: '🌙', intervalColor: '#3b82f6' },
+  { name: 'Lisinopril 10mg', time: '8:00 AM',  hour: 8,  minute: 0, taken: false, interval: 'Morning',   intervalEmoji: '🌅', intervalColor: '#fbbf24' },
+  { name: 'Lisinopril 10mg', time: '12:00 PM', hour: 12, minute: 0, taken: false, interval: 'Afternoon', intervalEmoji: '☀️', intervalColor: '#f97316' },
+  { name: 'Lisinopril 10mg', time: '6:00 PM',  hour: 18, minute: 0, taken: false, interval: 'Evening',   intervalEmoji: '🌙', intervalColor: '#3b82f6' },
 ];
 
 type ReminderKey = string;
 
 // ─── Overdue alarm helpers ────────────────────────────────────────────────────
 function isMissedDose(med: Medication): boolean {
+  if (med.taken || med.locked) return false;
   const now = new Date();
   const due = new Date();
   due.setHours(med.hour, med.minute, 0, 0);
-  return !med.taken && now > due;
+  return now > due;
 }
 
 // ─── Voice readiness (web speechSynthesis gate) ──────────────────────────────
@@ -80,6 +88,21 @@ async function waitForVoices(): Promise<void> {
     setTimeout(resolve, 3000);
   });
 }
+
+// ─── Name setup step type ────────────────────────────────────────────────────
+type NameStep =
+  | 'idle'
+  | 'verify'           // auto-announce on load: "Your name is X. Is that correct?"
+  | 'attempt1'         // first NO: mic listening for spoken name
+  | 'attempt1-confirm' // heard name — YES/NO confirm
+  | 'spell-first'      // second NO: spell first name
+  | 'spell-first-confirm'
+  | 'spell-last'       // spell last name
+  | 'spell-last-confirm'
+  | 'speaking'         // legacy: after language change
+  | 'listening'
+  | 'input'
+  | 'confirm';
 
 export default function HomeScreen() {
   const { languageLabel, setLanguageLabel } = useAppLanguage();
@@ -105,17 +128,24 @@ export default function HomeScreen() {
   const [showEmergency,             setShowEmergency]             = useState(false);
   const [emergencyPhrase,           setEmergencyPhrase]           = useState<string | undefined>(undefined);
 
+  // ── Speaker switch & Read-All (ST-5) ───────────────────────────────────────
+  const [speakerEnabled, setSpeakerEnabled]   = useState(false);
+  const [isReadingAll,   setIsReadingAll]     = useState(false);
+
   // ── Language / name setup flow ─────────────────────────────────────────────
-  const [nameSetupPhrase, setNameSetupPhrase] = useState('');
-  const [nameSetupStep,   setNameSetupStep]   = useState<'idle' | 'speaking' | 'listening' | 'input' | 'confirm'>('idle');
-  const [heardName,       setHeardName]       = useState('');
+  const [nameSetupPhrase,   setNameSetupPhrase]   = useState('');
+  const [nameSetupStep,     setNameSetupStep]     = useState<NameStep>('idle');
+  const [heardName,         setHeardName]         = useState('');
+  const [nameAttempt,       setNameAttempt]       = useState(0);
+  const [spellBuffer,       setSpellBuffer]       = useState('');
+  const [confirmedFirst,    setConfirmedFirst]    = useState('');
 
   // ── Overdue alarm state ────────────────────────────────────────────────────
-  const overdueTimers = useRef<Record<string, ReturnType<typeof setInterval>>>({});
+  const overdueTimers    = useRef<Record<string, ReturnType<typeof setInterval>>>({});
+  const overdueStartTime = useRef<Record<string, number>>({});
   const [overdueAlarm, setOverdueAlarm] = useState<Medication | null>(null);
 
   // ── Voice trigger 4-step state ─────────────────────────────────────────────
-  // 'idle' | 'step1-listen' | 'step2-countdown' | 'step3-alone' | 'step4-onway'
   type VoiceStep = 'idle' | 'step1-listen' | 'step2-countdown' | 'step3-alone' | 'step4-onway';
   const [voiceStep,       setVoiceStep]       = useState<VoiceStep>('idle');
   const [voicePhrase,     setVoicePhrase]     = useState('');
@@ -160,12 +190,13 @@ export default function HomeScreen() {
     void Speech.stop();
   }, []);
 
-  // ── TTS helper (offline — expo-speech only) ───────────────────────────────
+  // ── TTS helper (offline — expo-speech only, pitch 0.95 for intelligibility) ─
   const speak = useCallback((text: string, promptLanguage = languageRef.current) => {
     AccessibilityInfo.announceForAccessibility(text);
     const go = () => Speech.speak(text, {
       language: promptLanguage.code,
-      rate:     Math.min(0.65, speechRate),
+      rate:     Math.min(ACCESSIBLE_RATE, speechRate),
+      pitch:    0.95,
       volume:   soundLevel / 100,
     });
     if (Platform.OS === 'web' && !voicesReady.current) {
@@ -181,7 +212,10 @@ export default function HomeScreen() {
     Alert.alert(title, message);
   };
 
-  // ── Voice recognition (name setup + voice triggers) ───────────────────────
+  // ── Voice recognition (name setup) ───────────────────────────────────────
+  const nameSetupStepRef = useRef(nameSetupStep);
+  useEffect(() => { nameSetupStepRef.current = nameSetupStep; }, [nameSetupStep]);
+
   const {
     isListening:    nameIsListening,
     startListening: nameStartListening,
@@ -193,15 +227,56 @@ export default function HomeScreen() {
       if (!isFinal) return;
       const trimmed = text.trim();
       if (!trimmed) return;
+      nameStopListening();
+      const step = nameSetupStepRef.current;
+
+      // Spell steps: accumulate letters from the transcript
+      if (step === 'spell-first' || step === 'spell-last') {
+        // Convert spoken letters "H E L P" → "HELP", or accept plain word
+        const letters = trimmed.toUpperCase().replace(/\s+/g, '');
+        const word = letters.length > 0 ? letters : trimmed;
+        if (step === 'spell-first') {
+          setSpellBuffer(word);
+          setNameSetupStep('spell-first-confirm');
+          speak(getUiCopy(languageLabel).nameSpelledFirst(word));
+        } else {
+          setSpellBuffer(word);
+          setNameSetupStep('spell-last-confirm');
+          speak(getUiCopy(languageLabel).nameSpelledLast(word));
+        }
+        return;
+      }
+
+      // Regular name capture
       setHeardName(trimmed);
       setNameSetupPhrase(trimmed);
-      nameStopListening();
-      setNameSetupStep('confirm');
+      if (step === 'attempt1') {
+        setNameSetupStep('attempt1-confirm');
+      } else {
+        setNameSetupStep('confirm');
+      }
       speak(`${getUiCopy(languageLabel).iHeard(trimmed)}. ${getUiCopy(languageLabel).tapToConfirm}`);
     },
   });
 
-  // ── Voice trigger mic (step1) ──────────────────────────────────────────────
+  // ── Chime helpers for voice trigger feedback ──────────────────────────────
+  const playAscendingChime = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setTimeout(() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium), 140);
+    setTimeout(() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy),  280);
+  }, []);
+
+  const playLowDoubleTone = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+    setTimeout(() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy), 220);
+  }, []);
+
+  // ── Voice trigger mic (step1 + step2 cancel detection) ───────────────────
+  const voiceStepRef   = useRef(voiceStep);
+  useEffect(() => { voiceStepRef.current = voiceStep; }, [voiceStep]);
+  const voicePhraseRef = useRef(voicePhrase);
+  useEffect(() => { voicePhraseRef.current = voicePhrase; }, [voicePhrase]);
+
   const {
     isListening:    triggerIsListening,
     startListening: triggerStartListening,
@@ -211,27 +286,42 @@ export default function HomeScreen() {
     onResult: (text, isFinal) => {
       if (!isFinal) return;
       triggerStopListening();
-      // Any spoken text in step1 counts as confirmation — proceed to step 2
-      if (voiceStep === 'step1-listen') {
-        startVoiceStep2();
+      const step = voiceStepRef.current;
+      const trimmed = text.trim();
+
+      // Step 2: microphone stays open — detect cancel words
+      if (step === 'step2-countdown') {
+        const lower = trimmed.toLowerCase();
+        if (/\b(cancel|stop|no)\b/.test(lower)) {
+          cancelVoiceFlow();
+        }
+        return;
+      }
+
+      if (step !== 'step1-listen') return;
+      if (trimmed) {
+        speak(`I heard: ${trimmed}`);
+        const lower   = trimmed.toLowerCase();
+        const phrase  = voicePhraseRef.current.toLowerCase();
+        const isRecog = lower.includes(phrase) || phrase.split(' ').some(w => lower.includes(w));
+        if (isRecog) { playAscendingChime(); } else { playLowDoubleTone(); }
+        const t = setTimeout(() => startVoiceStep2(), 1200);
+        voiceTimersRef.current = [...voiceTimersRef.current, t];
       }
     },
   });
 
   // ── Language helpers ───────────────────────────────────────────────────────
   const selectLanguage = (label: LanguageLabel) => {
-    const next = getLanguage(label);
+    const next     = getLanguage(label);
     const nextCopy = getUiCopy(label);
     setLanguageLabel(label);
     Haptics.selectionAsync();
-    // Speak immediately in new language
     const go = () => {
       speak(next.languageChangedPrompt, next);
-      // After language change prompt, guide name setup using new language strings
       setTimeout(() => {
         setNameSetupStep('speaking');
         speak(nextCopy.namePromptSpeak, next);
-        // After 4 seconds pause, show text input + mic fallback
         setTimeout(() => setNameSetupStep('input'), 4000);
       }, 2000);
     };
@@ -242,12 +332,11 @@ export default function HomeScreen() {
     }
   };
 
+  // ── Name verification handlers ────────────────────────────────────────────
   const confirmNameSetup = () => {
     const trimmed = nameSetupPhrase.trim() || heardName.trim();
     if (trimmed) setPatientName(trimmed);
-    setNameSetupStep('confirm');
     setHeardName('');
-    // Ascending chime (3 haptic taps) for YES
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setTimeout(() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium), 150);
     setTimeout(() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy),  300);
@@ -256,31 +345,80 @@ export default function HomeScreen() {
   };
 
   const rejectNameSetup = () => {
-    // Descending chime for NO
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
     setTimeout(() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium), 150);
     setTimeout(() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light),  300);
+    const attempt = nameAttempt + 1;
+    setNameAttempt(attempt);
     setNameSetupPhrase('');
     setHeardName('');
-    setNameSetupStep('speaking');
-    speak(copy.namePromptSpeak);
-    setTimeout(() => setNameSetupStep('input'), 4000);
+    if (attempt >= 2) {
+      // Second rejection → spelling flow
+      setNameSetupStep('spell-first');
+      speak(copy.spellFirstName);
+      // Auto-start mic after TTS
+      const t = setTimeout(() => nameStartListening(), 1500);
+      voiceTimersRef.current = [...voiceTimersRef.current, t];
+    } else {
+      // First rejection → attempt1
+      setNameSetupStep('attempt1');
+      speak('Bring your phone close and say your name slowly.');
+      const t = setTimeout(() => nameStartListening(), 1500);
+      voiceTimersRef.current = [...voiceTimersRef.current, t];
+    }
   };
+
+  const confirmSpelledFirst = () => {
+    setConfirmedFirst(spellBuffer);
+    setSpellBuffer('');
+    setNameSetupStep('spell-last');
+    speak(copy.spellLastName);
+    const t = setTimeout(() => nameStartListening(), 1500);
+    voiceTimersRef.current = [...voiceTimersRef.current, t];
+  };
+
+  const rejectSpelledFirst = () => {
+    setSpellBuffer('');
+    setNameSetupStep('spell-first');
+    speak(copy.spellFirstName);
+    const t = setTimeout(() => nameStartListening(), 1500);
+    voiceTimersRef.current = [...voiceTimersRef.current, t];
+  };
+
+  const confirmSpelledLast = () => {
+    const fullName = `${confirmedFirst} ${spellBuffer}`.trim();
+    setPatientName(fullName);
+    setNameSetupPhrase(fullName);
+    setSpellBuffer('');
+    setConfirmedFirst('');
+    speak(`Thank you. Your name is ${fullName}.`);
+    setTimeout(() => setNameSetupStep('idle'), 2000);
+  };
+
+  const rejectSpelledLast = () => {
+    setSpellBuffer('');
+    setNameSetupStep('spell-last');
+    speak(copy.spellLastName);
+    const t = setTimeout(() => nameStartListening(), 1500);
+    voiceTimersRef.current = [...voiceTimersRef.current, t];
+  };
+
+  // ── On-mount name verification (every launch) ─────────────────────────────
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setNameSetupStep('verify');
+      speak(copy.nameIsCorrect(patientName));
+    }, 2000);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // ── Medication helpers ─────────────────────────────────────────────────────
   const confirmAndToggleMedication = (index: number) => {
     const medication = medications[index];
-    if (!medication.taken) {
-      // Show Green YES Voice Bubble confirmation before marking taken
+    if (!medication.taken && !medication.locked) {
       setPendingTakeMed({ med: medication, index });
       speak(`${medication.intervalEmoji} ${medication.interval} medication: ${medication.name}. Please confirm you are taking this dose now.`);
-    } else {
-      // Untaking — no extra confirmation needed
-      setMedications(current =>
-        current.map((item, i) => i === index ? { ...item, taken: false } : item),
-      );
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-      speak(language.medicationTakenPrompt(medication.name, false));
     }
   };
 
@@ -289,31 +427,57 @@ export default function HomeScreen() {
     const { index } = pendingTakeMed;
     const medication = medications[index];
     setMedications(current =>
-      current.map((item, i) => i === index ? { ...item, taken: true } : item),
+      current.map((item, i) => i === index ? { ...item, taken: true, locked: false } : item),
     );
-    // Double-tap haptic confirms single-dose completion
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
     setTimeout(() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy), 140);
     speak(language.medicationTakenPrompt(medication.name, true));
-    // Clear overdue alarm for this med
-    if (overdueTimers.current[medication.name]) {
-      clearInterval(overdueTimers.current[medication.name]);
-      delete overdueTimers.current[medication.name];
+    // Clear overdue alarm for this med (key = name__time)
+    const key = `${medication.name}__${medication.time}`;
+    if (overdueTimers.current[key]) {
+      clearInterval(overdueTimers.current[key]);
+      delete overdueTimers.current[key];
     }
     setPendingTakeMed(null);
   };
 
-  // ── Overdue alarm engine ───────────────────────────────────────────────────
+  // ── Overdue alarm engine (max 6 alerts = 1 hour, then lockout) ───────────
   const startOverdueAlarm = (med: Medication) => {
-    if (overdueTimers.current[med.name]) return; // already running
+    const key = `${med.name}__${med.time}`;
+    if (overdueTimers.current[key]) return;
+    overdueStartTime.current[key] = Date.now();
+    let alertCount = 0;
     const tick = () => {
-      if (med.taken) { clearInterval(overdueTimers.current[med.name]); return; }
+      if (med.taken || med.locked) {
+        clearInterval(overdueTimers.current[key]);
+        delete overdueTimers.current[key];
+        return;
+      }
+      // 1-hour / 6-alert lockout (Condition 2: missed after all 6 alerts)
+      if (alertCount >= 6) {
+        clearInterval(overdueTimers.current[key]);
+        delete overdueTimers.current[key];
+        // Gray out — locked flag, NOT taken ✓
+        setMedications(current =>
+          current.map(item =>
+            item.name === med.name && item.time === med.time
+              ? { ...item, locked: true }
+              : item,
+          ),
+        );
+        speak(`Reminder for ${med.name} at ${med.time} has expired. Dose cannot be taken now.`);
+        setOverdueAlarm(null);
+        return;
+      }
+      // Pause while emergency flow is open
+      if (showEmergency) return;
+      alertCount += 1;
       setOverdueAlarm(med);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       speak(`Missed dose alert: ${med.name} was due at ${med.time}. Please take it now or cancel this reminder.`);
     };
     tick();
-    overdueTimers.current[med.name] = setInterval(tick, 10 * 60 * 1000); // every 10 min
+    overdueTimers.current[key] = setInterval(tick, 10 * 60 * 1000);
   };
 
   // Check for overdue doses on mount and every minute
@@ -327,7 +491,7 @@ export default function HomeScreen() {
     const iv = setInterval(check, 60 * 1000);
     return () => clearInterval(iv);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [medications]);
+  }, [medications, showEmergency]);
 
   // ── Midnight reset ─────────────────────────────────────────────────────────
   useEffect(() => {
@@ -336,7 +500,7 @@ export default function HomeScreen() {
     midnight.setHours(24, 0, 0, 0);
     const msUntilMidnight = midnight.getTime() - now.getTime();
     const t = setTimeout(() => {
-      setMedications(initialMedications.map(m => ({ ...m, taken: false })));
+      setMedications(initialMedications.map(m => ({ ...m, taken: false, locked: false })));
       setMedicationReminders({});
     }, msUntilMidnight);
     return () => clearTimeout(t);
@@ -405,10 +569,46 @@ export default function HomeScreen() {
     speak(copy.appointmentDateChanged);
   };
 
-  const isHighContrast  = contrastMode === 'high';
-  const takenCount      = medications.filter(m => m.taken).length;
-  const speakDashboard  = () =>
+  const isHighContrast = contrastMode === 'high';
+  const takenCount     = medications.filter(m => m.taken).length;
+
+  const speakDashboard = () =>
     speak(`${copy.welcomeBack}, ${patientName}. ${copy.medsComplete(takenCount, medications.length)}.`);
+
+  // ── Read-All helper (ST-5) ────────────────────────────────────────────────
+  const buildReadAllText = () => {
+    const apptDate = appointmentAt.toLocaleDateString(language.code, dateOptions);
+    const medLines = medications.map(m =>
+      `${m.name}, due at ${m.time}, ${m.taken ? 'taken' : m.locked ? 'missed' : 'not yet taken'}`,
+    ).join('. ');
+    return [
+      `${copy.welcomeBack}, ${patientName}.`,
+      `${copy.medsComplete(takenCount, medications.length)}.`,
+      `Medications: ${medLines}.`,
+      `Next appointment with ${patient.doctor} on ${apptDate} at ${patient.appointmentTime}.`,
+      `Emergency Voice Triggers section: tap Help, My chest hurts, or I can't breathe to activate emergency flow.`,
+    ].join(' ');
+  };
+
+  const handleReadAll = () => {
+    if (isReadingAll) {
+      void Speech.stop();
+      setIsReadingAll(false);
+      return;
+    }
+    setIsReadingAll(true);
+    const text = buildReadAllText();
+    AccessibilityInfo.announceForAccessibility(text);
+    Speech.speak(text, {
+      language: language.code,
+      rate:     Math.min(ACCESSIBLE_RATE, speechRate),
+      pitch:    0.95,
+      volume:   soundLevel / 100,
+      onDone:   () => setIsReadingAll(false),
+      onStopped:() => setIsReadingAll(false),
+      onError:  () => setIsReadingAll(false),
+    });
+  };
 
   // ── Trigger emergency flow with optional phrase ────────────────────────────
   const triggerEmergency = (phrase?: string) => {
@@ -417,9 +617,7 @@ export default function HomeScreen() {
     setShowEmergency(true);
   };
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // cancelVoiceFlow — stop all timers, TTS, mic for voice trigger panel
-  // ─────────────────────────────────────────────────────────────────────────
+  // ── cancelVoiceFlow — stop all timers, TTS, mic ────────────────────────────
   const cancelVoiceFlow = () => {
     voiceTimersRef.current.forEach(clearTimeout);
     voiceTimersRef.current = [];
@@ -430,33 +628,41 @@ export default function HomeScreen() {
     setVoicePauseLeft(30);
   };
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // startVoiceStep2 — 5-second countdown then step 3
-  // ─────────────────────────────────────────────────────────────────────────
+  // ── startVoiceStep2 — 5-second SILENT clear-the-air countdown then step 3 ─
   const startVoiceStep2 = () => {
-    triggerStopListening();
+    // Keep mic open during countdown so user can say "Cancel"
     setVoiceStep('step2-countdown');
     setVoiceCountdown(5);
 
-    // count down 5 → 0
-    const ticks = [1, 2, 3, 4, 5].map((offset) =>
-      setTimeout(() => setVoiceCountdown(v => Math.max(0, v - 1)), offset * 1000),
+    // Count down 5 → 0 with haptic every second (no TTS — silent countdown)
+    const ticks = [1, 2, 3, 4, 5].map(offset =>
+      setTimeout(() => {
+        setVoiceCountdown(v => Math.max(0, v - 1));
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+      }, offset * 1000),
     );
 
-    // After 5 seconds move to step 3 (are you alone?)
+    // After 5 s: speak "Help coming." then transition to step3
     const t = setTimeout(() => {
       ticks.forEach(clearTimeout);
-      setVoiceStep('step3-alone');
-      speak(copy.areYouAlone);
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+      // "Help coming." — no "is" or "on its way"
+      speak(copy.helpIsOnTheWay);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      // Transition to Living Situation Question 800 ms after TTS fires
+      const t2 = setTimeout(() => {
+        setVoiceStep('step3-alone');
+        speak(copy.livingQuestion);
+        // Auto-start mic 1.5 s after TTS begins
+        const t3 = setTimeout(() => triggerStartListening(), 1500);
+        voiceTimersRef.current = [...voiceTimersRef.current, t3];
+      }, 800);
+      voiceTimersRef.current = [...voiceTimersRef.current, t2];
     }, 5500);
 
     voiceTimersRef.current = [...ticks, t];
   };
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // startVoiceStep4 — 30s pause then "Help is on the way"
-  // ─────────────────────────────────────────────────────────────────────────
+  // ── startVoiceStep4 — "Help coming" then 30-second pause ──────────────────
   const startVoiceStep4 = (isAlone: boolean) => {
     void Speech.stop();
     setVoiceStep('step4-onway');
@@ -471,11 +677,10 @@ export default function HomeScreen() {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     }, 31000);
 
-    // Immediately speak alone confirmation
     const aloneMsg = isAlone
       ? (languageLabel === '日本語' ? '一人であることを記録しました。'
         : languageLabel === 'Español' ? 'Entendido. Estás solo.'
-        : 'Understood. You are alone.')
+        : 'Understood. You are alone. Help is on the way.')
       : (languageLabel === '日本語' ? '近くにいる方に付き添いをお願いしてください。'
         : languageLabel === 'Español' ? 'Entendido. Quédate con alguien.'
         : 'Understood. Please stay with someone nearby.');
@@ -484,18 +689,16 @@ export default function HomeScreen() {
     voiceTimersRef.current = [...ticks, t];
   };
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // triggerVoicePanel — Step 1: speak prompt, start mic listening
-  // ─────────────────────────────────────────────────────────────────────────
+  // ── triggerVoicePanel — tap trigger box → immediate instruction + auto-mic ─
   const triggerVoicePanel = (phrase: string) => {
     cancelVoiceFlow();
     setVoicePhrase(phrase);
     setVoiceStep('step1-listen');
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-    // Speak the prompt in the current language
-    speak(copy.voiceTriggerPrompt(phrase));
-    // Auto-start mic after TTS (500ms buffer for TTS to begin playing)
-    const t = setTimeout(() => triggerStartListening(), 500);
+    // Immediately speak: "Bring your mouth closer to the microphone and speak the text indicated in the box."
+    speak(copy.triggerInstruction);
+    // Auto-start mic 1.5 s after spoken instruction begins (so TTS is not self-captured)
+    const t = setTimeout(() => triggerStartListening(), 1500);
     voiceTimersRef.current = [t];
   };
 
@@ -507,7 +710,7 @@ export default function HomeScreen() {
         {/* ── Header zone: sticky bar + settings dropdown ── */}
         <View style={styles.headerZone}>
 
-          {/* ── Persistent dual mode toggles — always visible ── */}
+          {/* ── Persistent dual mode toggles + speaker/read-all — always visible ── */}
           <View style={styles.modeToggleRow}>
 
             {/* STAND-ALONE MODE button */}
@@ -546,6 +749,41 @@ export default function HomeScreen() {
                 CLOUD{'\n'}SYNC
               </Text>
               {!isStandalone && <Text style={styles.modeBtnBadge}>● ACTIVE</Text>}
+            </TouchableOpacity>
+
+            {/* ── ST-5: Speaker Switch ── */}
+            <View style={styles.speakerSwitchBox}>
+              <Text style={[styles.speakerSwitchLabel, { fontSize: 10 * fontScale }]}>
+                🔊 {speakerEnabled ? 'ON' : 'OFF'}
+              </Text>
+              <Switch
+                value={speakerEnabled}
+                onValueChange={on => {
+                  setSpeakerEnabled(on);
+                  if (on) {
+                    speak(copy.speakerOn);
+                    setTimeout(() => speak(`${copy.welcomeBack}, ${patientName}. ${copy.medsComplete(takenCount, medications.length)}.`), 1200);
+                  } else {
+                    void Speech.stop();
+                  }
+                }}
+                trackColor={{ false: '#374151', true: '#15803d' }}
+                thumbColor={speakerEnabled ? '#4ade80' : '#94a3b8'}
+                accessibilityRole="switch"
+                accessibilityLabel={speakerEnabled ? copy.speakerOn : copy.speakerOff}
+              />
+            </View>
+
+            {/* ── ST-5: Read Everything button ── */}
+            <TouchableOpacity
+              style={[styles.readAllBtn, isReadingAll && styles.readAllBtnActive]}
+              onPress={handleReadAll}
+              accessibilityRole="button"
+              accessibilityLabel={isReadingAll ? copy.stopReading : copy.readAll}
+            >
+              <Text style={[styles.readAllBtnText, { fontSize: 10 * fontScale }]}>
+                {isReadingAll ? copy.stopReading : copy.readAll}
+              </Text>
             </TouchableOpacity>
 
             {/* Language & Accessibility gear button */}
@@ -605,14 +843,40 @@ export default function HomeScreen() {
                 ))}
               </View>
 
-              {/* ── Guided name setup (appears after language tap) ── */}
+              {/* ── Guided name setup (appears after language tap or on initial verify) ── */}
               {nameSetupStep !== 'idle' && (
                 <View style={styles.nameSetupBox}>
+                  {/* Prompt text changes per step */}
                   <Text style={[styles.nameSetupPrompt, { fontSize: 13 * fontScale }]}>
-                    {copy.namePromptSpeak}
+                    {nameSetupStep === 'verify'
+                      ? copy.nameIsCorrect(patientName)
+                      : nameSetupStep === 'attempt1' || nameSetupStep === 'attempt1-confirm'
+                        ? copy.namePromptSpeak
+                        : nameSetupStep === 'spell-first' || nameSetupStep === 'spell-first-confirm'
+                          ? copy.spellFirstName
+                          : nameSetupStep === 'spell-last' || nameSetupStep === 'spell-last-confirm'
+                            ? copy.spellLastName
+                            : copy.namePromptSpeak}
                   </Text>
-                  {/* 🎤 Mic button */}
-                  {micSupported && (nameSetupStep === 'speaking' || nameSetupStep === 'input') && (
+
+                  {/* ✏ pencil button — available at every step */}
+                  <TouchableOpacity
+                    style={styles.editNameBtn}
+                    onPress={() => { setNameSetupStep('input'); setNameSetupPhrase(patientName); }}
+                    accessibilityRole="button"
+                    accessibilityLabel={copy.editName}
+                  >
+                    <Text style={[styles.editNameBtnText, { fontSize: 13 * fontScale }]}>{copy.editName}</Text>
+                  </TouchableOpacity>
+
+                  {/* 🎤 Mic button — shown during listening steps */}
+                  {micSupported && (
+                    nameSetupStep === 'speaking' ||
+                    nameSetupStep === 'input' ||
+                    nameSetupStep === 'attempt1' ||
+                    nameSetupStep === 'spell-first' ||
+                    nameSetupStep === 'spell-last'
+                  ) && (
                     <TouchableOpacity
                       style={[styles.micBtn, nameIsListening && styles.micBtnActive]}
                       onPress={() => nameIsListening ? nameStopListening() : nameStartListening()}
@@ -625,8 +889,9 @@ export default function HomeScreen() {
                       </Text>
                     </TouchableOpacity>
                   )}
+
                   {/* Heard name display */}
-                  {heardName !== '' && nameSetupStep !== 'confirm' && (
+                  {heardName !== '' && (
                     <View style={styles.heardNameRow}>
                       <Text style={[styles.heardNameText, { fontSize: 13 * fontScale }]}>
                         {copy.iHeard(heardName)}
@@ -641,17 +906,32 @@ export default function HomeScreen() {
                       </TouchableOpacity>
                     </View>
                   )}
+
+                  {/* Spelled buffer display */}
+                  {spellBuffer !== '' && (
+                    <Text style={[styles.heardNameText, { fontSize: 13 * fontScale }]}>
+                      {copy.iHeard(spellBuffer)}
+                    </Text>
+                  )}
+
+                  {/* MicTextInput — for input / confirm steps */}
                   {(nameSetupStep === 'input' || nameSetupStep === 'confirm') && (
-                    <TextInput
-                      style={[styles.nameInput, { fontSize: 15 * fontScale }]}
+                    <MicTextInput
                       value={nameSetupPhrase}
                       onChangeText={setNameSetupPhrase}
+                      onMicPress={() => nameIsListening ? nameStopListening() : nameStartListening()}
+                      isListening={nameIsListening}
                       placeholder="Your name…"
-                      placeholderTextColor="#64748b"
-                      accessibilityLabel="Type your name here"
+                      accessibilityLabel="Type your name"
+                      inputStyle={{ fontSize: 15 * fontScale }}
                     />
                   )}
-                  {(nameSetupStep === 'input' || nameSetupStep === 'confirm') && (
+
+                  {/* YES/NO confirmation buttons */}
+                  {(nameSetupStep === 'verify' ||
+                    nameSetupStep === 'input' ||
+                    nameSetupStep === 'confirm' ||
+                    nameSetupStep === 'attempt1-confirm') && (
                     <View style={styles.nameConfirmRow}>
                       <TouchableOpacity
                         style={styles.nameYesBtn}
@@ -671,6 +951,31 @@ export default function HomeScreen() {
                       </TouchableOpacity>
                     </View>
                   )}
+
+                  {/* Spelled first-name confirmation */}
+                  {nameSetupStep === 'spell-first-confirm' && (
+                    <View style={styles.nameConfirmRow}>
+                      <TouchableOpacity style={styles.nameYesBtn} onPress={confirmSpelledFirst} accessibilityRole="button">
+                        <Text style={[styles.actionText, { fontSize: 14 * fontScale }]}>✓ YES</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity style={styles.nameNoBtn} onPress={rejectSpelledFirst} accessibilityRole="button">
+                        <Text style={[styles.actionText, { fontSize: 14 * fontScale }]}>✗ NO</Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
+
+                  {/* Spelled last-name confirmation */}
+                  {nameSetupStep === 'spell-last-confirm' && (
+                    <View style={styles.nameConfirmRow}>
+                      <TouchableOpacity style={styles.nameYesBtn} onPress={confirmSpelledLast} accessibilityRole="button">
+                        <Text style={[styles.actionText, { fontSize: 14 * fontScale }]}>✓ YES</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity style={styles.nameNoBtn} onPress={rejectSpelledLast} accessibilityRole="button">
+                        <Text style={[styles.actionText, { fontSize: 14 * fontScale }]}>✗ NO</Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
+
                   {nameSetupStep === 'speaking' && !nameIsListening && (
                     <Text style={[styles.bodyText, { fontSize: 12 * fontScale }]}>
                       {copy.tapToConfirm}
@@ -679,14 +984,13 @@ export default function HomeScreen() {
                 </View>
               )}
 
-              {/* Divider */}
               <View style={styles.settingsDivider} />
 
               {/* Accessibility controls */}
               <Text style={[styles.settingsSectionLabel, { fontSize: 11 * fontScale }]}>ACCESSIBILITY</Text>
               <Text style={[styles.bodyText, { fontSize: 13 * fontScale }]}>{copy.foregroundReminderNote}</Text>
 
-              {/* High Contrast toggle with ✓/✗ badge */}
+              {/* High Contrast toggle */}
               <View style={styles.actionRow}>
                 <TouchableOpacity
                   style={[styles.secondaryButton, isHighContrast && styles.contrastActive]}
@@ -713,24 +1017,14 @@ export default function HomeScreen() {
                 </TouchableOpacity>
               </View>
 
-              {/* 🔊 Volume stepper */}
+              {/* Volume stepper */}
               <View style={styles.stepperRow}>
                 <Text style={[styles.stepperLabel, { fontSize: 13 * fontScale }]}>🔊 Volume: {soundLevel}%</Text>
                 <View style={styles.stepperBtns}>
-                  <TouchableOpacity
-                    style={styles.stepperBtn}
-                    onPress={() => setSoundLevel(v => Math.max(0, v - 10))}
-                    accessibilityRole="button"
-                    accessibilityLabel="Decrease volume"
-                  >
+                  <TouchableOpacity style={styles.stepperBtn} onPress={() => setSoundLevel(v => Math.max(0, v - 10))} accessibilityRole="button" accessibilityLabel="Decrease volume">
                     <Text style={[styles.actionText, { fontSize: 16 * fontScale }]}>−</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity
-                    style={styles.stepperBtn}
-                    onPress={() => setSoundLevel(v => Math.min(100, v + 10))}
-                    accessibilityRole="button"
-                    accessibilityLabel="Increase volume"
-                  >
+                  <TouchableOpacity style={styles.stepperBtn} onPress={() => setSoundLevel(v => Math.min(100, v + 10))} accessibilityRole="button" accessibilityLabel="Increase volume">
                     <Text style={[styles.actionText, { fontSize: 16 * fontScale }]}>+</Text>
                   </TouchableOpacity>
                 </View>
@@ -740,20 +1034,10 @@ export default function HomeScreen() {
               <View style={styles.stepperRow}>
                 <Text style={[styles.stepperLabel, { fontSize: 13 * fontScale }]}>Speech: {speechRate.toFixed(2)}×</Text>
                 <View style={styles.stepperBtns}>
-                  <TouchableOpacity
-                    style={styles.stepperBtn}
-                    onPress={() => setSpeechRate(v => Math.max(0.4, +(v - 0.05).toFixed(2)))}
-                    accessibilityRole="button"
-                    accessibilityLabel="Decrease speech speed"
-                  >
+                  <TouchableOpacity style={styles.stepperBtn} onPress={() => setSpeechRate(v => Math.max(0.4, +(v - 0.05).toFixed(2)))} accessibilityRole="button" accessibilityLabel="Decrease speech speed">
                     <Text style={[styles.actionText, { fontSize: 16 * fontScale }]}>−</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity
-                    style={styles.stepperBtn}
-                    onPress={() => setSpeechRate(v => Math.min(1.0, +(v + 0.05).toFixed(2)))}
-                    accessibilityRole="button"
-                    accessibilityLabel="Increase speech speed"
-                  >
+                  <TouchableOpacity style={styles.stepperBtn} onPress={() => setSpeechRate(v => Math.min(1.0, +(v + 0.05).toFixed(2)))} accessibilityRole="button" accessibilityLabel="Increase speech speed">
                     <Text style={[styles.actionText, { fontSize: 16 * fontScale }]}>+</Text>
                   </TouchableOpacity>
                 </View>
@@ -789,12 +1073,14 @@ export default function HomeScreen() {
                 {/* Editable patient name */}
                 {editingName ? (
                   <View style={styles.nameEditRow}>
-                    <TextInput
-                      style={[styles.nameEditInput, { fontSize: 20 * fontScale }]}
+                    <MicTextInput
                       value={draftName}
                       onChangeText={setDraftName}
-                      autoFocus
+                      onMicPress={() => nameIsListening ? nameStopListening() : nameStartListening()}
+                      isListening={nameIsListening}
                       accessibilityLabel="Edit patient name"
+                      autoFocus
+                      inputStyle={{ fontSize: 20 * fontScale, color: '#f1f5f9' }}
                     />
                     <TouchableOpacity
                       style={styles.nameEditSave}
@@ -815,6 +1101,42 @@ export default function HomeScreen() {
                     <Text style={styles.editPencil}>✏️</Text>
                   </TouchableOpacity>
                 )}
+
+                {/* ── ST-2: Name verification prompt shown below the name ── */}
+                {(nameSetupStep === 'verify') && !showAccessibility && (
+                  <View style={styles.nameVerifyInline}>
+                    <Text style={[styles.nameVerifyText, { fontSize: 13 * fontScale }]}>
+                      {copy.nameIsCorrect(patientName)}
+                    </Text>
+                    <View style={styles.nameConfirmRow}>
+                      <TouchableOpacity
+                        style={styles.nameYesBtn}
+                        onPress={confirmNameSetup}
+                        accessibilityRole="button"
+                        accessibilityLabel="Yes — name is correct"
+                      >
+                        <Text style={[styles.actionText, { fontSize: 13 * fontScale }]}>✓ YES</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={styles.nameNoBtn}
+                        onPress={rejectNameSetup}
+                        accessibilityRole="button"
+                        accessibilityLabel="No — name is incorrect"
+                      >
+                        <Text style={[styles.actionText, { fontSize: 13 * fontScale }]}>✗ NO</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={styles.editNameBtn}
+                        onPress={() => { setDraftName(patientName); setEditingName(true); setNameSetupStep('idle'); }}
+                        accessibilityRole="button"
+                        accessibilityLabel={copy.editName}
+                      >
+                        <Text style={[styles.editNameBtnText, { fontSize: 12 * fontScale }]}>{copy.editName}</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                )}
+
                 <Text style={[styles.bodyText, { fontSize: 15 * fontScale }]}>{copy.condition}</Text>
                 <Text style={[styles.bodyText, styles.summary, { fontSize: 14 * fontScale }]}>
                   {copy.medsComplete(takenCount, medications.length)}
@@ -839,7 +1161,6 @@ export default function HomeScreen() {
                 <Text style={[styles.bodyText, { fontSize: 13 * fontScale }]}>{patient.appointmentTime}</Text>
                 <Text style={[styles.bodyText, { fontSize: 12 * fontScale }]}>{copy.appointmentLocation}</Text>
                 <View style={styles.apptActions}>
-                  {/* Remind Me — teal */}
                   <View style={styles.apptBtnRow}>
                     <TouchableOpacity
                       style={[styles.apptButton, styles.apptButtonRemind]}
@@ -859,7 +1180,6 @@ export default function HomeScreen() {
                       <Text>🔊</Text>
                     </TouchableOpacity>
                   </View>
-                  {/* Move +1 Day — blue */}
                   <View style={styles.apptBtnRow}>
                     <TouchableOpacity
                       style={[styles.apptButton, styles.apptButtonMove]}
@@ -886,62 +1206,78 @@ export default function HomeScreen() {
           {/* Today's medications */}
           <View style={styles.section}>
             <Text style={[styles.sectionTitle, { fontSize: 22 * fontScale }]}>{copy.medications}</Text>
-            {medications.map((medication, index) => (
-              <View key={medication.name} style={[styles.medicationRow, medication.taken && styles.medicationRowTaken]}>
-                {/* Interval badge */}
-                <View style={[styles.intervalBadge, { backgroundColor: medication.intervalColor + '22', borderColor: medication.intervalColor }]}>
-                  <Text style={[styles.intervalBadgeText, { color: medication.intervalColor, fontSize: 12 * fontScale }]}>
-                    {medication.intervalEmoji} {medication.interval}
-                  </Text>
-                </View>
-                <View style={styles.medNameRow}>
-                  <Text style={[styles.medicationName, { fontSize: 18 * fontScale }]}>{medication.name}</Text>
-                  <TouchableOpacity
-                    style={styles.speakerIconBtn}
-                    onPress={() => speak(`${medication.intervalEmoji} ${medication.interval} medication: ${medication.name}, due at ${medication.time}.`)}
-                    accessibilityRole="button"
-                    accessibilityLabel={`Read ${medication.name} aloud`}
-                  >
-                    <Text>🔊</Text>
-                  </TouchableOpacity>
-                </View>
-                <Text style={[styles.bodyText, { fontSize: 16 * fontScale }]}>{copy.dueAt(medication.time)}</Text>
-                <View style={styles.actionRow}>
-                  <TouchableOpacity
-                    style={[styles.takenButton, medication.taken && styles.takenButtonDone]}
-                    onPress={() => confirmAndToggleMedication(index)}
-                    accessibilityRole="button"
-                    accessibilityLabel={`${medication.name}: ${medication.taken ? copy.taken : copy.markTaken}`}
-                    disabled={medication.taken}
-                  >
-                    <Text style={[styles.actionText, { fontSize: 16 * fontScale }]}>
-                      {medication.taken ? copy.taken : copy.markTaken}
+            {medications.map((medication, index) => {
+              const isDisabled = medication.taken || !!medication.locked;
+              return (
+                <View
+                  key={`${medication.name}-${medication.time}`}
+                  style={[styles.medicationRow, isDisabled && styles.medicationRowTaken]}
+                  // ST-7 accessibility: announce missed/locked doses to screen readers
+                  accessibilityLiveRegion="polite"
+                >
+                  {/* Interval badge */}
+                  <View style={[styles.intervalBadge, { backgroundColor: medication.intervalColor + '22', borderColor: medication.intervalColor }]}>
+                    <Text style={[styles.intervalBadgeText, { color: medication.intervalColor, fontSize: 12 * fontScale }]}>
+                      {medication.intervalEmoji} {medication.interval}
                     </Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={styles.reminderButton}
-                    onPress={() => scheduleDailyMedicationReminder(medication)}
-                    accessibilityRole="button"
-                    accessibilityLabel={`${medication.name}: ${medicationReminders[medication.name] ? copy.cancelReminder : copy.remindMe}`}
-                  >
-                    <Text style={[styles.actionText, { fontSize: 16 * fontScale }]}>
-                      {medicationReminders[medication.name] ? copy.reminderOn : copy.remindMe}
-                    </Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={styles.speakerIconBtn}
-                    onPress={() => speak(`${medicationReminders[medication.name] ? 'Cancel reminder for' : 'Remind me to take'} ${medication.name}`)}
-                    accessibilityRole="button"
-                    accessibilityLabel="Read reminder button aloud"
-                  >
-                    <Text>🔊</Text>
-                  </TouchableOpacity>
+                  </View>
+                  <View style={styles.medNameRow}>
+                    <Text style={[styles.medicationName, { fontSize: 18 * fontScale }]}>{medication.name}</Text>
+                    <TouchableOpacity
+                      style={styles.speakerIconBtn}
+                      onPress={() => speak(`${medication.intervalEmoji} ${medication.interval} medication: ${medication.name}, due at ${medication.time}.`)}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Read ${medication.name} aloud`}
+                    >
+                      <Text>🔊</Text>
+                    </TouchableOpacity>
+                  </View>
+                  <Text style={[styles.bodyText, { fontSize: 16 * fontScale }]}>{copy.dueAt(medication.time)}</Text>
+                  <View style={styles.actionRow}>
+                    <TouchableOpacity
+                      style={[
+                        styles.takenButton,
+                        medication.taken && styles.takenButtonDone,
+                        medication.locked && styles.takenButtonLocked,
+                      ]}
+                      onPress={() => !isDisabled && confirmAndToggleMedication(index)}
+                      accessibilityRole="button"
+                      accessibilityLabel={`${medication.name}: ${medication.taken ? copy.takenDone : medication.locked ? 'Missed — locked' : copy.markTaken}`}
+                      disabled={isDisabled}
+                    >
+                      <Text style={[styles.actionText, { fontSize: 16 * fontScale }]}>
+                        {medication.taken
+                          ? copy.takenDone
+                          : medication.locked
+                            ? '✗ Missed'
+                            : copy.markTaken}
+                      </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.reminderButton}
+                      onPress={() => scheduleDailyMedicationReminder(medication)}
+                      accessibilityRole="button"
+                      accessibilityLabel={`${medication.name}: ${medicationReminders[medication.name] ? copy.cancelReminder : copy.remindMe}`}
+                    >
+                      <Text style={[styles.actionText, { fontSize: 16 * fontScale }]}>
+                        {medicationReminders[medication.name] ? copy.reminderOn : copy.remindMe}
+                      </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.speakerIconBtn}
+                      onPress={() => speak(`${medicationReminders[medication.name] ? 'Cancel reminder for' : 'Remind me to take'} ${medication.name}`)}
+                      accessibilityRole="button"
+                      accessibilityLabel="Read reminder button aloud"
+                    >
+                      <Text>🔊</Text>
+                    </TouchableOpacity>
+                  </View>
                 </View>
-              </View>
-            ))}
+              );
+            })}
           </View>
 
-          {/* HELP button — launches full 7-guardrail emergency flow */}
+          {/* HELP button */}
           <Animated.View style={{ transform: [{ scale: helpPulse }] }}>
             <View style={styles.helpButtonRow}>
               <TouchableOpacity
@@ -965,12 +1301,12 @@ export default function HomeScreen() {
             </View>
           </Animated.View>
 
-          {/* ── Voice trigger panel — 4-step flow ─────────────────────────────────
-               Step 1 (step1-listen):    Speak prompt + mic button + tap-to-confirm
-               Step 2 (step2-countdown): 5-second countdown screen
-               Step 3 (step3-alone):     "Are you alone?" Yes/No
-               Step 4 (step4-onway):     30-second pause → "Help is on the way"
-               idle:                     Three buttons side-by-side
+          {/* ── Voice trigger panel — 4-step flow ──────────────────────────────
+               idle:          Three phrase buttons
+               step1-listen:  Instruction shown, mic auto-active, listening badge
+               step2-countdown: 5-second silent "clear the air" countdown
+               step3-alone:   Living Situation Question (Yes with someone / No live alone)
+               step4-onway:   30-second pause → "Help coming."
           ── */}
           <View style={styles.voiceShortcutPanel}>
             <Text style={[styles.sectionTitle, { fontSize: 14 * fontScale }]}>
@@ -981,7 +1317,7 @@ export default function HomeScreen() {
             {voiceStep === 'idle' && (
               <>
                 <Text style={[styles.bodyText, { fontSize: 12 * fontScale }]}>
-                  Tap a phrase — real mic listening + 4-step flow.
+                  Tap a phrase to speak to the microphone for immediate emergency activation.
                 </Text>
                 <View style={styles.actionRow}>
                   {(['Help', 'My chest hurts', "I can't breathe"] as const).map(phrase => (
@@ -1010,12 +1346,24 @@ export default function HomeScreen() {
               </>
             )}
 
-            {/* ── Step 1: Listen & Speak Word Prompt ── */}
+            {/* ── Step 1: Instruction shown, mic auto-listening ── */}
             {voiceStep === 'step1-listen' && (
               <View style={styles.voiceStepBox}>
-                <Text style={[styles.sectionTitle, { fontSize: 15 * fontScale }]}>
-                  {copy.voiceTriggerPrompt(voicePhrase)}
+                {/* Instruction text (verbatim from spec) */}
+                <Text style={[styles.nameSetupPrompt, { fontSize: 14 * fontScale, marginBottom: 8 }]}>
+                  {copy.triggerInstruction}
                 </Text>
+                {/* Phrase to say */}
+                <Text style={[styles.sectionTitle, { fontSize: 18 * fontScale }]}>
+                  {'\u201C'}{voicePhrase}{'\u201D'}
+                </Text>
+                {/* Mic status badge */}
+                <View style={[styles.listeningBadge, triggerIsListening && styles.listeningBadgeActive]}>
+                  <Text style={[styles.listeningBadgeText, { fontSize: 13 * fontScale }]}>
+                    {triggerIsListening ? copy.listeningIndicator : '🎤 Tap to retry mic'}
+                  </Text>
+                </View>
+                {/* Manual mic fallback */}
                 <TouchableOpacity
                   style={[styles.micBtn, triggerIsListening && styles.micBtnActive]}
                   onPress={() => triggerIsListening ? triggerStopListening() : triggerStartListening()}
@@ -1023,25 +1371,22 @@ export default function HomeScreen() {
                   accessibilityLabel={triggerIsListening ? 'Stop microphone' : 'Start microphone'}
                 >
                   <Text style={{ fontSize: 32 }}>🎤</Text>
-                  <Text style={[styles.micBtnLabel, { fontSize: 13 * fontScale }]}>
-                    {triggerIsListening ? copy.listeningIndicator : '🎤 Tap to start mic'}
-                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.voiceCancelBtn} onPress={cancelVoiceFlow} accessibilityRole="button" accessibilityLabel={copy.cancelAmbulance}>
+                  <Text style={[styles.actionText, { fontSize: 14 * fontScale }]}>✕ {copy.cancelAmbulance}</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  style={styles.nameYesBtn}
-                  onPress={startVoiceStep2}
+                  style={styles.returnHomeBtn}
+                  onPress={cancelVoiceFlow}
                   accessibilityRole="button"
-                  accessibilityLabel="Tap to confirm and continue"
+                  accessibilityLabel={copy.returnToMainPage}
                 >
-                  <Text style={[styles.actionText, { fontSize: 14 * fontScale }]}>{copy.tapToConfirm}</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.voiceCancelBtn} onPress={cancelVoiceFlow} accessibilityRole="button">
-                  <Text style={[styles.actionText, { fontSize: 13 * fontScale }]}>✕ {copy.noCancel}</Text>
+                  <Text style={[styles.actionText, { fontSize: 13 * fontScale }]}>← {copy.returnToMainPage}</Text>
                 </TouchableOpacity>
               </View>
             )}
 
-            {/* ── Step 2: Demo Simulation + 5-second countdown ── */}
+            {/* ── Step 2: 5-second silent clear-the-air countdown ── */}
             {voiceStep === 'step2-countdown' && (
               <View style={styles.voiceStepBox}>
                 <Text style={[styles.sectionTitle, { fontSize: 18 * fontScale }]}>
@@ -1049,45 +1394,75 @@ export default function HomeScreen() {
                 </Text>
                 <Text style={[styles.countdownBig, { fontSize: 72 * fontScale }]}>{voiceCountdown}</Text>
                 <Text style={[styles.bodyText, { fontSize: 14 * fontScale }]}>
-                  {copy.secondsRemaining(voiceCountdown)}
+                  {copy.clearTheAirInstruction}
                 </Text>
+                {/* Listening badge during countdown */}
+                <View style={[styles.listeningBadge, triggerIsListening && styles.listeningBadgeActive]}>
+                  <Text style={[styles.listeningBadgeText, { fontSize: 12 * fontScale }]}>
+                    {triggerIsListening ? copy.listeningIndicator : '🎤 Mic ready'}
+                  </Text>
+                </View>
                 <TouchableOpacity style={styles.voiceCancelBtn} onPress={cancelVoiceFlow} accessibilityRole="button" accessibilityLabel={copy.cancelAmbulance}>
                   <Text style={[styles.actionText, { fontSize: 14 * fontScale }]}>✕ {copy.cancelAmbulance}</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.returnHomeBtn}
+                  onPress={cancelVoiceFlow}
+                  accessibilityRole="button"
+                  accessibilityLabel={copy.returnToMainPage}
+                >
+                  <Text style={[styles.actionText, { fontSize: 13 * fontScale }]}>← {copy.returnToMainPage}</Text>
                 </TouchableOpacity>
               </View>
             )}
 
-            {/* ── Step 3: Are You Alone? ── */}
+            {/* ── Step 3: Living Situation Question ── */}
             {voiceStep === 'step3-alone' && (
               <View style={styles.voiceStepBox}>
                 <Text style={[styles.sectionTitle, { fontSize: 20 * fontScale }]}>
-                  {copy.areYouAlone}
+                  {copy.livingQuestion}
                 </Text>
+                {/* Mic listening badge */}
+                <View style={[styles.listeningBadge, triggerIsListening && styles.listeningBadgeActive]}>
+                  <Text style={[styles.listeningBadgeText, { fontSize: 12 * fontScale }]}>
+                    {triggerIsListening ? copy.listeningIndicator : '🎤 Tap to speak'}
+                  </Text>
+                </View>
                 <View style={styles.aloneRow}>
+                  {/* Green: Yes, with someone */}
                   <TouchableOpacity
-                    style={[styles.aloneYesBtn]}
-                    onPress={() => startVoiceStep4(true)}
-                    accessibilityRole="button"
-                    accessibilityLabel="Yes, I am alone"
-                  >
-                    <Text style={[styles.actionText, { fontSize: 18 * fontScale }]}>YES</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[styles.aloneNoBtn]}
+                    style={[styles.aloneNoBtn, styles.withSomeoneBtn]}
                     onPress={() => startVoiceStep4(false)}
                     accessibilityRole="button"
-                    accessibilityLabel="No, someone is nearby"
+                    accessibilityLabel={copy.livingWithSomeone}
                   >
-                    <Text style={[styles.actionText, { fontSize: 18 * fontScale }]}>NO</Text>
+                    <Text style={[styles.actionText, { fontSize: 15 * fontScale }]}>{copy.livingWithSomeone}</Text>
+                  </TouchableOpacity>
+                  {/* Red: No, live alone */}
+                  <TouchableOpacity
+                    style={[styles.aloneYesBtn, styles.liveAloneBtn]}
+                    onPress={() => startVoiceStep4(true)}
+                    accessibilityRole="button"
+                    accessibilityLabel={copy.livingAlone}
+                  >
+                    <Text style={[styles.actionText, { fontSize: 15 * fontScale }]}>{copy.livingAlone}</Text>
                   </TouchableOpacity>
                 </View>
                 <TouchableOpacity style={styles.voiceCancelBtn} onPress={cancelVoiceFlow} accessibilityRole="button" accessibilityLabel={copy.cancelAmbulance}>
                   <Text style={[styles.actionText, { fontSize: 13 * fontScale }]}>✕ {copy.cancelAmbulance}</Text>
                 </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.returnHomeBtn}
+                  onPress={cancelVoiceFlow}
+                  accessibilityRole="button"
+                  accessibilityLabel={copy.returnToMainPage}
+                >
+                  <Text style={[styles.actionText, { fontSize: 13 * fontScale }]}>← {copy.returnToMainPage}</Text>
+                </TouchableOpacity>
               </View>
             )}
 
-            {/* ── Step 4: 30-second pause + Help is on the way ── */}
+            {/* ── Step 4: Help coming — 30-second hold ── */}
             {voiceStep === 'step4-onway' && (
               <View style={styles.voiceStepBox}>
                 <Text style={[styles.sectionTitle, { fontSize: 18 * fontScale }]}>
@@ -1096,22 +1471,20 @@ export default function HomeScreen() {
                 <Text style={[styles.bodyText, { fontSize: 14 * fontScale }]}>
                   {voicePauseLeft > 0 ? copy.secondsRemaining(voicePauseLeft) : copy.helpIsOnTheWay}
                 </Text>
-                <TouchableOpacity
-                  style={styles.returnHomeBtn}
-                  onPress={() => { cancelVoiceFlow(); speak(copy.returnHome); }}
-                  accessibilityRole="button"
-                  accessibilityLabel={copy.returnHome}
-                >
-                  <Text style={[styles.actionText, { fontSize: 14 * fontScale }]}>← {copy.returnHome}</Text>
-                </TouchableOpacity>
                 <TouchableOpacity style={styles.voiceCancelBtn} onPress={cancelVoiceFlow} accessibilityRole="button" accessibilityLabel={copy.cancelAmbulance}>
                   <Text style={[styles.actionText, { fontSize: 13 * fontScale }]}>✕ {copy.cancelAmbulance}</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.returnHomeBtn}
+                  onPress={cancelVoiceFlow}
+                  accessibilityRole="button"
+                  accessibilityLabel={copy.returnToMainPage}
+                >
+                  <Text style={[styles.actionText, { fontSize: 14 * fontScale }]}>← {copy.returnToMainPage}</Text>
                 </TouchableOpacity>
               </View>
             )}
           </View>
-
-          {/* NOTE: greenTierBtn (I AM OKAY) removed — accessed via pain scale 1–3 */}
 
         </ScrollView>
 
@@ -1144,26 +1517,16 @@ export default function HomeScreen() {
 
           {/* Volume stepper in bottom bar */}
           <View style={styles.volumeStepperBar}>
-            <TouchableOpacity
-              style={styles.stepperBtnSmall}
-              onPress={() => setSoundLevel(v => Math.max(0, v - 10))}
-              accessibilityRole="button"
-              accessibilityLabel="Decrease volume"
-            >
+            <TouchableOpacity style={styles.stepperBtnSmall} onPress={() => setSoundLevel(v => Math.max(0, v - 10))} accessibilityRole="button" accessibilityLabel="Decrease volume">
               <Text style={[styles.bottomAccessBtnText, { fontSize: 14 * fontScale }]}>−</Text>
             </TouchableOpacity>
             <Text style={[styles.bottomAccessBtnText, { fontSize: 12 * fontScale }]}>🔊 {soundLevel}%</Text>
-            <TouchableOpacity
-              style={styles.stepperBtnSmall}
-              onPress={() => setSoundLevel(v => Math.min(100, v + 10))}
-              accessibilityRole="button"
-              accessibilityLabel="Increase volume"
-            >
+            <TouchableOpacity style={styles.stepperBtnSmall} onPress={() => setSoundLevel(v => Math.min(100, v + 10))} accessibilityRole="button" accessibilityLabel="Increase volume">
               <Text style={[styles.bottomAccessBtnText, { fontSize: 14 * fontScale }]}>+</Text>
             </TouchableOpacity>
           </View>
 
-          {/* Floating Explore double-tap button — bottom right */}
+          {/* Floating Explore double-tap button */}
           <TouchableOpacity
             style={styles.exploreFloatBtn}
             onPress={() => {
@@ -1171,7 +1534,6 @@ export default function HomeScreen() {
               const delta = now - exploreTapTime.current;
               exploreTapTime.current = now;
               exploreTapRef.current += 1;
-
               if (exploreTapRef.current >= 2 && delta < 400) {
                 exploreTapRef.current = 0;
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -1204,19 +1566,31 @@ export default function HomeScreen() {
         <View style={styles.overdueOverlay}>
           <View style={styles.overdueCard}>
             <Text style={styles.overdueTitle}>⏰ MISSED DOSE ALERT</Text>
-            <Text style={styles.overdueBody}>
+            <Text
+              style={styles.overdueBody}
+              accessibilityLiveRegion="polite"
+            >
               {overdueAlarm ? `${overdueAlarm.name} was due at ${overdueAlarm.time}. Please take it now.` : ''}
             </Text>
             <TouchableOpacity
               style={styles.overdueCancel}
               onPress={() => {
-                // Stop any active speech and clear the repeating alarm interval
                 void Speech.stop();
                 if (overdueAlarm) {
-                  clearInterval(overdueTimers.current[overdueAlarm.name]);
-                  delete overdueTimers.current[overdueAlarm.name];
+                  // Condition 1: user cancels — stop all further alerts for this dose
+                  const key = `${overdueAlarm.name}__${overdueAlarm.time}`;
+                  clearInterval(overdueTimers.current[key]);
+                  delete overdueTimers.current[key];
+                  // Gray out the dose (locked — cannot be taken)
+                  const med = overdueAlarm;
+                  setMedications(current =>
+                    current.map(item =>
+                      item.name === med.name && item.time === med.time
+                        ? { ...item, locked: true }
+                        : item,
+                    ),
+                  );
                 }
-                // Dismiss modal and fully reset alarm state
                 setOverdueAlarm(null);
               }}
               accessibilityRole="button"
@@ -1269,7 +1643,7 @@ export default function HomeScreen() {
         </View>
       </Modal>
 
-      {/* Emergency flow modal — receives isStandalone from the root toggle */}
+      {/* Emergency flow modal */}
       <Modal
         visible={showEmergency}
         animationType="slide"
@@ -1297,242 +1671,167 @@ const styles = StyleSheet.create({
   safeHighContrast: { backgroundColor: '#000000' },
   cardHighContrast: { backgroundColor: '#111827', borderColor: '#facc15', borderWidth: 3 },
 
-  // Header zone — wraps sticky bar + dropdown so z-index stacks above ScrollView
   headerZone: { zIndex: 10 },
-
-  // Scrollable area
   scroll: { padding: 16, paddingBottom: 40, gap: 14 },
 
-  // Language & Accessibility button — top-right of sticky bar
-  gearButton:       { minHeight: 56, minWidth: 80, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10, backgroundColor: '#1e293b', borderWidth: 2, borderColor: '#d97706', justifyContent: 'center', alignItems: 'center' },
-  gearButtonActive: { backgroundColor: '#1d4ed8', borderColor: '#60a5fa' },
-  gearIcon:         { fontSize: 32, color: '#d97706', textAlign: 'center' },
-  gearLabel:        { color: '#e2e8f0', fontSize: 13, fontWeight: '700', lineHeight: 17, textAlign: 'center' },
+  // ── Mode toggle row ──
+  modeToggleRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#0f172a', paddingHorizontal: 8, paddingVertical: 6, gap: 6, flexWrap: 'wrap' },
+  modeBtn:       { minHeight: 52, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, backgroundColor: '#1e293b', borderWidth: 1, borderColor: '#334155', alignItems: 'center', justifyContent: 'center' },
+  modeBtnStandaloneActive: { backgroundColor: '#1e3a5f', borderColor: '#3b82f6' },
+  modeBtnCloudActive:      { backgroundColor: '#14532d', borderColor: '#22c55e' },
+  modeBtnIcon:   { fontSize: 18, textAlign: 'center' },
+  modeBtnLabel:  { color: '#e2e8f0', fontWeight: '700', textAlign: 'center', lineHeight: 15 },
+  modeBtnBadge:  { color: '#4ade80', fontSize: 9, fontWeight: '800', letterSpacing: 0.5 },
 
-  // Settings dropdown panel
+  // ── Speaker switch (ST-5) ──
+  speakerSwitchBox: { alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4, gap: 2 },
+  speakerSwitchLabel: { color: '#94a3b8', fontWeight: '600', letterSpacing: 0.5 },
+
+  // ── Read All button (ST-5) ──
+  readAllBtn:      { minHeight: 44, paddingHorizontal: 8, paddingVertical: 6, borderRadius: 8, backgroundColor: '#1e293b', borderWidth: 1, borderColor: '#475569', alignItems: 'center', justifyContent: 'center' },
+  readAllBtnActive:{ backgroundColor: '#7f1d1d', borderColor: '#ef4444' },
+  readAllBtnText:  { color: '#e2e8f0', fontWeight: '700', textAlign: 'center' },
+
+  // Language & Accessibility gear button
+  gearButton:       { minHeight: 56, minWidth: 70, paddingHorizontal: 10, paddingVertical: 8, borderRadius: 10, backgroundColor: '#1e293b', borderWidth: 2, borderColor: '#d97706', justifyContent: 'center', alignItems: 'center' },
+  gearButtonActive: { backgroundColor: '#1d4ed8', borderColor: '#60a5fa' },
+  gearIcon:         { fontSize: 28, color: '#d97706', textAlign: 'center' },
+  gearLabel:        { color: '#e2e8f0', fontSize: 11, fontWeight: '700', lineHeight: 14, textAlign: 'center' },
+
+  // Settings dropdown
   settingsPanel:        { width: '100%', backgroundColor: '#111827', borderBottomWidth: 1, borderColor: '#1e293b', padding: 16, gap: 10, zIndex: 100 },
   settingsSectionLabel: { color: '#475569', fontWeight: '700', letterSpacing: 0.8, marginBottom: 2 },
   settingsDivider:      { height: 1, backgroundColor: '#1e293b', marginVertical: 4 },
   panelHeader:          { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   panelCloseButton:     { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 8, backgroundColor: '#1d4ed8', borderWidth: 1, borderColor: '#60a5fa' },
   panelCloseText:       { color: '#ffffff', fontWeight: '700', fontSize: 14 },
-
-  // High contrast active indicator
-  contrastActive: { backgroundColor: '#14532d', borderColor: '#4ade80', borderWidth: 2 },
-
-  // Stepper row (volume / speech speed)
+  contrastActive:       { backgroundColor: '#14532d', borderColor: '#4ade80', borderWidth: 2 },
   stepperRow:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 2 },
   stepperLabel: { color: '#e2e8f0', fontWeight: '600', flex: 1 },
   stepperBtns:  { flexDirection: 'row', gap: 8 },
   stepperBtn:   { minWidth: 44, minHeight: 44, backgroundColor: '#1e293b', borderColor: '#334155', borderWidth: 1, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
+  langPicker:           { flexDirection: 'row', gap: 6, flexWrap: 'wrap' },
+  langChip:             { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 6, borderWidth: 1, borderColor: '#334155', backgroundColor: '#1e293b' },
+  langChipSelected:     { backgroundColor: '#1d4ed8', borderColor: '#60a5fa' },
+  langChipText:         { color: '#94a3b8', fontWeight: '500' },
+  langChipTextSelected: { color: '#ffffff', fontWeight: '600' },
 
-  // Language chips
-  langPicker:          { flexDirection: 'row', gap: 6, flexWrap: 'wrap' },
-  langChip:            { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 6, borderWidth: 1, borderColor: '#334155', backgroundColor: '#1e293b' },
-  langChipSelected:    { backgroundColor: '#1d4ed8', borderColor: '#60a5fa' },
-  langChipText:        { color: '#94a3b8', fontWeight: '500' },
-  langChipTextSelected:{ color: '#ffffff', fontWeight: '600' },
-
-  // Guided name setup box
+  // Name setup
   nameSetupBox:   { backgroundColor: '#0f172a', borderColor: '#1d4ed8', borderWidth: 2, borderRadius: 10, padding: 14, gap: 10, marginTop: 4 },
   nameSetupPrompt:{ color: '#93c5fd', fontWeight: '700', textAlign: 'center' },
   nameInput:      { backgroundColor: '#1e293b', color: '#f1f5f9', borderRadius: 8, padding: 10, borderColor: '#475569', borderWidth: 1 },
-  nameConfirmRow: { flexDirection: 'row', gap: 10 },
-  nameYesBtn:     { flex: 1, minHeight: 52, backgroundColor: '#15803d', borderColor: '#4ade80', borderWidth: 2, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
-  nameNoBtn:      { flex: 1, minHeight: 52, backgroundColor: '#991b1b', borderColor: '#ff453a', borderWidth: 2, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
+  editNameBtn:    { alignSelf: 'flex-end', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 6, backgroundColor: '#1e293b', borderWidth: 1, borderColor: '#475569' },
+  editNameBtnText:{ color: '#94a3b8', fontWeight: '600' },
 
-  // Patient header
-  header:         { backgroundColor: '#111827', borderColor: '#1e293b', borderWidth: 1, borderRadius: 12, padding: 16, gap: 8 },
-  appNameRow:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  appName:        { color: '#60a5fa', fontWeight: '600', fontSize: 14, letterSpacing: 0.3 },
-  greeting:       { color: '#f1f5f9', fontWeight: '700', lineHeight: 34 },
-  bodyText:       { color: '#94a3b8', lineHeight: 20 },
-  summary:        { color: '#93c5fd', fontWeight: '600' },
-  offlineText:    { color: '#facc15', fontWeight: '600', marginTop: 4, fontSize: 11 },
+  // Name verify inline (below greeting)
+  nameVerifyInline: { backgroundColor: '#0f172a', borderRadius: 8, borderWidth: 1, borderColor: '#1d4ed8', padding: 10, gap: 6, marginBottom: 4 },
+  nameVerifyText:   { color: '#93c5fd', fontWeight: '700' },
 
-  // Editable name
-  nameRow:       { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  editPencil:    { fontSize: 16 },
-  nameEditRow:   { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  nameEditInput: { flex: 1, color: '#f1f5f9', fontWeight: '700', borderBottomWidth: 2, borderColor: '#60a5fa', paddingVertical: 2 },
-  nameEditSave:  { padding: 4 },
+  heardNameRow:   { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  heardNameText:  { color: '#93c5fd', fontWeight: '600', flex: 1 },
+  nameConfirmRow: { flexDirection: 'row', gap: 8 },
+  nameYesBtn:     { flex: 1, backgroundColor: '#14532d', borderRadius: 8, paddingVertical: 10, alignItems: 'center', borderWidth: 1, borderColor: '#4ade80' },
+  nameNoBtn:      { flex: 1, backgroundColor: '#7f1d1d', borderRadius: 8, paddingVertical: 10, alignItems: 'center', borderWidth: 1, borderColor: '#f87171' },
 
-  // Two-column header layout
-  headerColumns:  { flexDirection: 'row', gap: 12, marginTop: 4 },
-  headerLeft:     { flex: 3, gap: 4 },
-  headerDivider:  { width: 1, backgroundColor: '#1e293b', alignSelf: 'stretch' },
-  headerRight:    { flex: 2, gap: 4 },
-
-  // Appointment right column
-  apptLabel:          { color: '#475569', fontWeight: '600', letterSpacing: 0.5, textTransform: 'uppercase' },
-  apptActions:        { flexDirection: 'column', gap: 6, marginTop: 6 },
-  apptBtnRow:         { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  apptButton:         { flex: 1, paddingHorizontal: 10, paddingVertical: 7, borderRadius: 6, borderWidth: 1, alignItems: 'center' },
-  apptButtonRemind:   { backgroundColor: '#0d4b45', borderColor: '#0d9488' },   // teal/green
-  apptButtonMove:     { backgroundColor: '#1e3a6e', borderColor: '#1d4ed8' },   // blue
-  apptButtonText:     { color: '#e2e8f0', fontWeight: '500', textAlign: 'center' },
-
-  // Progress bar
-  progressTrack: { height: 6, borderRadius: 3, backgroundColor: '#1e293b', marginTop: 8 },
-  progressFill:  { height: 6, borderRadius: 3, backgroundColor: '#16a34a' },
-
-  // HELP button row (button + speaker)
-  helpButtonRow:  { flexDirection: 'row', alignItems: 'stretch', gap: 8 },
-  helpButton:     { minHeight: 120, justifyContent: 'center', alignItems: 'center', backgroundColor: '#991b1b', borderColor: '#fecaca', borderWidth: 3, borderRadius: 12, padding: 16, gap: 6 },
-  helpTitle:      { color: '#ffffff', fontWeight: '700', textAlign: 'center' },
-  helpSubtitle:   { color: '#fecaca', textAlign: 'center', lineHeight: 22, fontSize: 14 },
-
-  // Sections
-  section:          { gap: 10, marginTop: 4 },
-  sectionTitle:     { color: '#f1f5f9', fontWeight: '600' },
-  medicationRow:    { backgroundColor: '#111827', borderColor: '#1e293b', borderWidth: 1, borderRadius: 12, padding: 14, gap: 8 },
-  medicationRowTaken: { backgroundColor: '#0d2818', borderColor: '#16a34a', borderWidth: 1 },
-  medicationName:   { color: '#f1f5f9', fontWeight: '600' },
-  medNameRow:       { flexDirection: 'row', alignItems: 'center', gap: 6 },
-
-  // Interval badge
-  intervalBadge:     { alignSelf: 'flex-start', borderWidth: 1, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3, marginBottom: 2 },
-  intervalBadgeText: { fontWeight: '700', letterSpacing: 0.3 },
-
-  // Buttons
-  actionRow:       { flexDirection: 'row', gap: 8 },
-  takenButton:     { flex: 2, minHeight: 56, justifyContent: 'center', alignItems: 'center', backgroundColor: '#15803d', borderRadius: 8, padding: 10 },
-  takenButtonDone: { backgroundColor: '#1c3b22', opacity: 0.7 },
-  reminderButton:  { flex: 1.5, minHeight: 60, justifyContent: 'center', alignItems: 'center', backgroundColor: '#1e3a6e', borderRadius: 8, padding: 10 },
-  secondaryButton: { flex: 1, minHeight: 52, justifyContent: 'center', alignItems: 'center', backgroundColor: '#1e293b', borderColor: '#334155', borderWidth: 1, borderRadius: 8, padding: 10 },
-  actionText:      { color: '#ffffff', textAlign: 'center', fontWeight: '600' },
-
-  // Speaker icon buttons
-  speakerIconBtn:     { minWidth: 36, minHeight: 36, justifyContent: 'center', alignItems: 'center', backgroundColor: '#1e293b', borderRadius: 8, borderWidth: 1, borderColor: '#334155' },
-  speakerIconBtnLarge:{ minWidth: 52, minHeight: 52, justifyContent: 'center', alignItems: 'center', backgroundColor: '#7c1d1d', borderRadius: 10, borderColor: '#ff453a', borderWidth: 2 },
-
-  // Trigger button with speaker
-  triggerBtnWrap: { flex: 1, gap: 4 },
-
-  // ── Voice shortcut panel ──────────────────────────────────────────────────
-  voiceShortcutPanel: {
-    backgroundColor: '#1a0a00',
-    borderColor: '#d97706',
-    borderWidth: 2,
-    borderRadius: 12,
-    padding: 14,
-    gap: 10,
-    marginTop: 4,
-  },
-  voiceTriggerBtn: {
-    flex: 1,
-    minHeight: 56,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#3a0000',
-    borderColor: '#ff453a',
-    borderWidth: 2,
-    borderRadius: 8,
-    padding: 8,
-  },
-
-  // ── Voice trigger 4-step inline screens ──────────────────────────────────
-  voiceStepBox:  { gap: 12, alignItems: 'center', paddingVertical: 8 },
-  countdownBig:  { color: '#ff453a', fontWeight: '900', textAlign: 'center' },
-  aloneRow:      { flexDirection: 'row', gap: 12, alignSelf: 'stretch' },
-  aloneYesBtn:   { flex: 1, minHeight: 72, justifyContent: 'center', alignItems: 'center', backgroundColor: '#15803d', borderColor: '#4ade80', borderWidth: 3, borderRadius: 12 },
-  aloneNoBtn:    { flex: 1, minHeight: 72, justifyContent: 'center', alignItems: 'center', backgroundColor: '#991b1b', borderColor: '#ff453a', borderWidth: 3, borderRadius: 12 },
-  voiceCancelBtn:{ alignSelf: 'stretch', minHeight: 48, justifyContent: 'center', alignItems: 'center', backgroundColor: '#292524', borderColor: '#d97706', borderWidth: 1, borderRadius: 8, padding: 10, marginTop: 4 },
-  returnHomeBtn: { alignSelf: 'stretch', minHeight: 48, justifyContent: 'center', alignItems: 'center', backgroundColor: '#1e3a6e', borderColor: '#60a5fa', borderWidth: 1, borderRadius: 8, padding: 10 },
-
-  // ── Mic button ─────────────────────────────────────────────────────────────
-  micBtn:       { alignSelf: 'stretch', minHeight: 60, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, backgroundColor: '#1e293b', borderColor: '#475569', borderWidth: 2, borderRadius: 10, padding: 10 },
-  micBtnActive: { backgroundColor: '#0f3460', borderColor: '#3b82f6', borderWidth: 2 },
+  // Mic button
+  micBtn:       { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#1e293b', borderRadius: 10, paddingHorizontal: 14, paddingVertical: 10, borderWidth: 2, borderColor: '#475569', alignSelf: 'center' },
+  micBtnActive: { backgroundColor: '#7f1d1d', borderColor: '#ef4444' },
   micBtnLabel:  { color: '#e2e8f0', fontWeight: '600' },
 
-  // ── Heard name row ─────────────────────────────────────────────────────────
-  heardNameRow:  { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#0f172a', borderRadius: 8, padding: 8 },
-  heardNameText: { color: '#93c5fd', fontWeight: '600', flex: 1 },
+  // Listening badge (ST-1/ST-3)
+  listeningBadge:       { paddingHorizontal: 12, paddingVertical: 5, borderRadius: 20, backgroundColor: '#1e293b', borderWidth: 1, borderColor: '#475569', alignSelf: 'center', marginVertical: 4 },
+  listeningBadgeActive: { backgroundColor: '#7f1d1d', borderColor: '#ef4444' },
+  listeningBadgeText:   { color: '#e2e8f0', fontWeight: '700', textAlign: 'center' },
 
-  // ── Dual mode toggle row ──────────────────────────────────────────────────
-  modeToggleRow: {
-    flexDirection: 'row',
-    alignItems: 'stretch',
-    backgroundColor: '#0a0a0a',
-    borderBottomColor: '#1e293b',
-    borderBottomWidth: 1,
-    paddingHorizontal: 8,
-    paddingVertical: 8,
-    gap: 6,
-  },
-  modeBtn: {
-    flex: 1,
-    minHeight: 64,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#1e293b',
-    borderWidth: 2,
-    borderColor: '#334155',
-    borderRadius: 10,
-    paddingVertical: 6,
-    gap: 2,
-  },
-  modeBtnStandaloneActive: { backgroundColor: '#292524', borderColor: '#d97706' },
-  modeBtnCloudActive:      { backgroundColor: '#0c1a2e', borderColor: '#1d4ed8' },
-  modeBtnIcon:  { fontSize: 22, textAlign: 'center' },
-  modeBtnLabel: { color: '#f1f5f9', fontWeight: '800', textAlign: 'center', lineHeight: 16 },
-  modeBtnBadge: { color: '#4ade80', fontSize: 10, fontWeight: '800', textAlign: 'center' },
+  // Header card
+  header:        { backgroundColor: '#0f172a', borderRadius: 16, borderWidth: 2, borderColor: '#1e3a5f', padding: 14, gap: 8 },
+  appNameRow:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  appName:       { color: '#60a5fa', fontWeight: '700', letterSpacing: 0.5 },
+  headerColumns: { flexDirection: 'row', gap: 10 },
+  headerLeft:    { flex: 1, gap: 4 },
+  headerRight:   { flex: 1, gap: 4 },
+  headerDivider: { width: 1, backgroundColor: '#1e3a5f' },
+  nameRow:       { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  nameEditRow:   { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  nameEditInput: { flex: 1, backgroundColor: '#1e293b', color: '#f1f5f9', borderRadius: 8, padding: 6, borderColor: '#475569', borderWidth: 1 },
+  nameEditSave:  { width: 36, height: 36, alignItems: 'center', justifyContent: 'center', backgroundColor: '#14532d', borderRadius: 8 },
+  greeting:      { color: '#f1f5f9', fontWeight: '800' },
+  editPencil:    { fontSize: 18 },
+  summary:       { color: '#60a5fa' },
+  progressTrack: { height: 6, backgroundColor: '#1e293b', borderRadius: 3, overflow: 'hidden' },
+  progressFill:  { height: '100%', backgroundColor: '#4ade80', borderRadius: 3 },
+  offlineText:   { color: '#475569', letterSpacing: 0.5 },
+  apptLabel:     { color: '#475569', fontWeight: '700', letterSpacing: 0.8 },
+  apptActions:   { gap: 6 },
+  apptBtnRow:    { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  apptButton:    { flex: 1, paddingVertical: 8, paddingHorizontal: 10, borderRadius: 8, alignItems: 'center' },
+  apptButtonRemind: { backgroundColor: '#134e4a', borderWidth: 1, borderColor: '#0d9488' },
+  apptButtonMove:   { backgroundColor: '#1e3a5f', borderWidth: 1, borderColor: '#3b82f6' },
+  apptButtonText:   { color: '#f1f5f9', fontWeight: '700' },
 
-  // ── Fixed bottom accessibility bar ────────────────────────────────────────
-  bottomAccessBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#0f172a',
-    borderTopColor: '#1e293b',
-    borderTopWidth: 1,
-    paddingHorizontal: 8,
-    paddingVertical: 8,
-    gap: 6,
-  },
-  bottomAccessBtn: {
-    flex: 1,
-    minHeight: 48,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#1e293b',
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#334155',
-  },
-  bottomAccessBtnText: { color: '#e2e8f0', fontWeight: '700', textAlign: 'center' },
+  // Medications
+  section:          { gap: 10 },
+  sectionTitle:     { color: '#f1f5f9', fontWeight: '800' },
+  bodyText:         { color: '#94a3b8' },
+  medicationRow:    { backgroundColor: '#0f172a', borderRadius: 12, borderWidth: 1, borderColor: '#1e3a5f', padding: 12, gap: 6 },
+  medicationRowTaken:{ opacity: 0.45 },
+  intervalBadge:    { alignSelf: 'flex-start', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, borderWidth: 1 },
+  intervalBadgeText:{ fontWeight: '700', letterSpacing: 0.5 },
+  medNameRow:       { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  medicationName:   { color: '#f1f5f9', fontWeight: '700', flex: 1 },
+  actionRow:        { flexDirection: 'row', gap: 8, flexWrap: 'wrap', alignItems: 'center' },
+  takenButton:      { flex: 1, minHeight: 48, paddingVertical: 10, paddingHorizontal: 8, backgroundColor: '#1d4ed8', borderRadius: 10, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#3b82f6' },
+  takenButtonDone:  { backgroundColor: '#14532d', borderColor: '#4ade80' },
+  takenButtonLocked:{ backgroundColor: '#374151', borderColor: '#6b7280', opacity: 0.5 },
+  reminderButton:   { flex: 1, minHeight: 48, paddingVertical: 10, paddingHorizontal: 8, backgroundColor: '#134e4a', borderRadius: 10, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#0d9488' },
+  actionText:       { color: '#f1f5f9', fontWeight: '700', textAlign: 'center' },
+  speakerIconBtn:   { width: 36, height: 36, alignItems: 'center', justifyContent: 'center', backgroundColor: '#1e293b', borderRadius: 8 },
+  speakerIconBtnLarge: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', backgroundColor: '#1e293b', borderRadius: 8 },
+  secondaryButton:  { flex: 1, minHeight: 44, paddingVertical: 8, paddingHorizontal: 10, backgroundColor: '#1e293b', borderRadius: 10, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#334155' },
 
-  // Volume stepper in bottom bar
-  volumeStepperBar: { flex: 1.5, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, backgroundColor: '#1e293b', borderRadius: 8, borderWidth: 1, borderColor: '#334155', minHeight: 48, paddingHorizontal: 4 },
-  stepperBtnSmall:  { minWidth: 28, minHeight: 36, justifyContent: 'center', alignItems: 'center' },
+  // HELP
+  helpButtonRow: { flexDirection: 'row', gap: 8, alignItems: 'center' },
+  helpButton:    { backgroundColor: '#7f1d1d', borderRadius: 14, borderWidth: 3, borderColor: '#ef4444', padding: 18, alignItems: 'center', justifyContent: 'center', minHeight: 90 },
+  helpTitle:     { color: '#ffffff', fontWeight: '900', letterSpacing: 1 },
+  helpSubtitle:  { color: '#fca5a5', fontWeight: '600' },
 
-  // ── Floating Explore double-tap button ────────────────────────────────────
-  exploreFloatBtn: {
-    minWidth: 60,
-    minHeight: 56,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#1d4ed8',
-    borderRadius: 10,
-    borderWidth: 2,
-    borderColor: '#60a5fa',
-    paddingHorizontal: 8,
-  },
-  exploreFloatText: { color: '#ffffff', fontWeight: '800', textAlign: 'center', lineHeight: 16 },
+  // Voice shortcut panel
+  voiceShortcutPanel: { backgroundColor: '#0f172a', borderRadius: 14, borderWidth: 1, borderColor: '#1e3a5f', padding: 14, gap: 10 },
+  voiceStepBox:       { gap: 10, alignItems: 'center' },
+  triggerBtnWrap:     { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  voiceTriggerBtn:    { flex: 1, backgroundColor: '#7f1d1d', borderRadius: 10, paddingVertical: 10, paddingHorizontal: 8, alignItems: 'center', borderWidth: 1, borderColor: '#ef4444' },
+  countdownBig:       { color: '#ef4444', fontWeight: '900', textAlign: 'center' },
+  aloneRow:           { flexDirection: 'row', gap: 12, width: '100%' },
+  aloneYesBtn:        { flex: 1, backgroundColor: '#7f1d1d', borderRadius: 12, paddingVertical: 16, alignItems: 'center', borderWidth: 2, borderColor: '#ef4444' },
+  aloneNoBtn:         { flex: 1, backgroundColor: '#1e3a5f', borderRadius: 12, paddingVertical: 16, alignItems: 'center', borderWidth: 2, borderColor: '#3b82f6' },
+  withSomeoneBtn:     { backgroundColor: '#14532d', borderColor: '#4ade80' },
+  liveAloneBtn:       { backgroundColor: '#7f1d1d', borderColor: '#ef4444' },
+  voiceCancelBtn:     { backgroundColor: '#1e293b', borderRadius: 10, paddingVertical: 10, paddingHorizontal: 16, borderWidth: 1, borderColor: '#475569', alignSelf: 'center' },
+  returnHomeBtn:      { backgroundColor: '#1e293b', borderRadius: 10, paddingVertical: 8, paddingHorizontal: 14, borderWidth: 1, borderColor: '#475569', alignSelf: 'center' },
 
-  // ── Overdue alarm modal ───────────────────────────────────────────────────
-  overdueOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.9)', alignItems: 'center', justifyContent: 'center', padding: 24 },
-  overdueCard:    { backgroundColor: '#3b0000', borderColor: '#ff453a', borderWidth: 3, borderRadius: 16, padding: 24, gap: 14, width: '100%', maxWidth: 400, alignItems: 'center' },
-  overdueTitle:   { color: '#ff453a', fontWeight: '900', fontSize: 22, textAlign: 'center' },
-  overdueBody:    { color: '#fecaca', fontSize: 16, textAlign: 'center', lineHeight: 22 },
-  overdueCancel:  { minHeight: 52, backgroundColor: '#7c2d12', borderColor: '#f59e0b', borderWidth: 2, borderRadius: 10, padding: 12, alignItems: 'center', justifyContent: 'center', alignSelf: 'stretch' },
+  // Bottom access bar
+  bottomAccessBar:    { flexDirection: 'row', alignItems: 'center', backgroundColor: '#0f172a', borderTopWidth: 1, borderColor: '#1e293b', paddingHorizontal: 8, paddingVertical: 6, gap: 6 },
+  bottomAccessBtn:    { paddingHorizontal: 10, paddingVertical: 8, borderRadius: 8, backgroundColor: '#1e293b' },
+  bottomAccessBtnText:{ color: '#94a3b8', fontWeight: '600' },
+  volumeStepperBar:   { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  stepperBtnSmall:    { width: 32, height: 32, alignItems: 'center', justifyContent: 'center', backgroundColor: '#1e293b', borderRadius: 6 },
+  exploreFloatBtn:    { marginLeft: 'auto', backgroundColor: '#1e293b', borderRadius: 10, paddingHorizontal: 10, paddingVertical: 8, alignItems: 'center', borderWidth: 1, borderColor: '#334155' },
+  exploreFloatText:   { color: '#94a3b8', fontWeight: '700', textAlign: 'center', lineHeight: 14 },
 
-  // ── Confirm take medication modal ─────────────────────────────────────────
-  confirmOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.85)', alignItems: 'center', justifyContent: 'center', padding: 24 },
-  confirmCard:    { backgroundColor: '#052e16', borderColor: '#4ade80', borderWidth: 3, borderRadius: 16, padding: 24, gap: 14, width: '100%', maxWidth: 400, alignItems: 'center' },
-  confirmTitle:   { color: '#4ade80', fontWeight: '900', fontSize: 22, textAlign: 'center' },
+  // Overdue alarm modal
+  overdueOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.8)', alignItems: 'center', justifyContent: 'center' },
+  overdueCard:    { backgroundColor: '#1f1f1f', borderRadius: 16, borderWidth: 3, borderColor: '#ef4444', padding: 24, width: '85%', gap: 12 },
+  overdueTitle:   { color: '#ef4444', fontSize: 20, fontWeight: '900', textAlign: 'center' },
+  overdueBody:    { color: '#f1f5f9', fontSize: 16, textAlign: 'center' },
+  overdueCancel:  { backgroundColor: '#374151', borderRadius: 10, paddingVertical: 12, alignItems: 'center', borderWidth: 1, borderColor: '#6b7280' },
+
+  // Confirm modal
+  confirmOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', alignItems: 'center', justifyContent: 'flex-end' },
+  confirmCard:    { backgroundColor: '#0f172a', borderTopLeftRadius: 20, borderTopRightRadius: 20, borderWidth: 2, borderColor: '#4ade80', padding: 24, width: '100%', gap: 12 },
+  confirmTitle:   { color: '#4ade80', fontSize: 20, fontWeight: '900', textAlign: 'center' },
   confirmBody:    { color: '#f1f5f9', fontSize: 16, textAlign: 'center', lineHeight: 24 },
-  confirmHint:    { color: '#86efac', fontSize: 13, textAlign: 'center' },
-  confirmBtnRow:  { flexDirection: 'row', gap: 14, alignSelf: 'stretch' },
-  confirmYes:     { flex: 1, minHeight: 80, backgroundColor: '#15803d', borderColor: '#4ade80', borderWidth: 3, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
-  confirmNo:      { flex: 1, minHeight: 80, backgroundColor: '#991b1b', borderColor: '#ff453a', borderWidth: 3, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  confirmHint:    { color: '#94a3b8', fontSize: 13, textAlign: 'center' },
+  confirmBtnRow:  { flexDirection: 'row', gap: 12 },
+  confirmYes:     { flex: 1, backgroundColor: '#14532d', borderRadius: 12, paddingVertical: 14, alignItems: 'center', borderWidth: 2, borderColor: '#4ade80' },
+  confirmNo:      { flex: 1, backgroundColor: '#7f1d1d', borderRadius: 12, paddingVertical: 14, alignItems: 'center', borderWidth: 2, borderColor: '#ef4444' },
 });
